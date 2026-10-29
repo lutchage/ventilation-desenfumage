@@ -29,16 +29,16 @@ TARGET_OPEN = "ouvrir"
 TARGET_CLOSE = "fermer"
 
 # Niveaux du pipeline : (priorité, clé, libellé)
-LEVEL_ALARM = (10, "alarme", "Alarme désenfumage")
-LEVEL_DISARMED = (9, "desarme", "Système désarmé")
-LEVEL_POWER_CUT = (8, "coupure", "Coupure secteur")
-LEVEL_MAINTENANCE = (7, "maintenance", "Maintenance")
-LEVEL_FAULT = (6, "defaut", "Défaut")
-LEVEL_STATION = (5, "station", "Panne station météo")
-LEVEL_WEATHER = (4, "meteo", "Météo défavorable")
+LEVEL_ALARM = (10, "alarme", "Alarme incendie")
+LEVEL_DISARMED = (9, "desarme", "Arrêt de sécurité – vérification requise")
+LEVEL_POWER_CUT = (8, "coupure", "Coupure de courant")
+LEVEL_MAINTENANCE = (7, "maintenance", "Maintenance en cours")
+LEVEL_FAULT = (6, "defaut", "Défaut de l'installation")
+LEVEL_STATION = (5, "station", "Station météo hors service")
+LEVEL_WEATHER = (4, "meteo", "Protection pluie / vent")
 LEVEL_OVERRIDE = (3, "manuel", "Commande manuelle")
-LEVEL_VENTILATION = (2, "ventilation", "Ventilation")
-LEVEL_DEFAULT = (0, "defaut_ferme", "Par défaut (fermé)")
+LEVEL_VENTILATION = (2, "ventilation", "Ventilation automatique")
+LEVEL_DEFAULT = (0, "defaut_ferme", "Au repos – fermé")
 
 ALL_LEVELS = [
     LEVEL_ALARM,

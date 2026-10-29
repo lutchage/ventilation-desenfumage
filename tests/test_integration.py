@@ -89,7 +89,7 @@ async def _tick(hass, freezer, delta: timedelta):
 async def test_setup_default_closed(hass, freezer, monkeypatch):
     entry, on, off = await _setup(hass, freezer, monkeypatch, _local(hass, 9, 0))
     st = _decision(hass)
-    assert st.state == "Par défaut (fermé)"
+    assert st.state == "Au repos – fermé"
     assert hass.states.get(f"sensor.{PREFIX}_mode_saisonnier").state == "normal"
     assert hass.states.get(f"switch.{PREFIX}_systeme_arme").state == "on"
     # première décision : une impulsion FERMER
@@ -100,7 +100,7 @@ async def test_normal_mode_daily_aeration(hass, freezer, monkeypatch):
     entry, on, off = await _setup(hass, freezer, monkeypatch, _local(hass, 12, 29))
     on.clear()
     await _tick(hass, freezer, timedelta(minutes=2))  # 12:31
-    assert _decision(hass).state == "Ventilation"
+    assert _decision(hass).state == "Ventilation automatique"
     assert [c.data["entity_id"] for c in on] == ["switch.shelly_a"]
     # interlock : FERMER relâché avant OUVRIR
     assert any(c.data["entity_id"] == "switch.shelly_b" for c in off)
@@ -109,7 +109,7 @@ async def test_normal_mode_daily_aeration(hass, freezer, monkeypatch):
     await _tick(hass, freezer, timedelta(minutes=6))  # 12:37
     assert on == []
     await _tick(hass, freezer, timedelta(minutes=4))  # 12:41
-    assert _decision(hass).state == "Par défaut (fermé)"
+    assert _decision(hass).state == "Au repos – fermé"
     assert [c.data["entity_id"] for c in on] == ["switch.shelly_b"]
 
 
@@ -120,11 +120,11 @@ async def test_weather_beats_manual_open(hass, freezer, monkeypatch):
     assert _decision(hass).state == "Commande manuelle"
     hass.states.async_set("sensor.ws90_rain", "1.2")
     await hass.async_block_till_done()
-    assert _decision(hass).state == "Météo défavorable"
+    assert _decision(hass).state == "Protection pluie / vent"
     # la pluie s'arrête : on reste fermé pendant le séchage
     hass.states.async_set("sensor.ws90_rain", "0")
     await hass.async_block_till_done()
-    assert _decision(hass).state == "Météo défavorable"
+    assert _decision(hass).state == "Protection pluie / vent"
     assert "Séchage" in _decision(hass).attributes["raison"]
 
 
@@ -136,7 +136,7 @@ async def test_unknown_movement_disarms(hass, freezer, monkeypatch):
     arme = hass.states.get(f"switch.{PREFIX}_systeme_arme")
     assert arme.state == "off"
     assert "Mouvement non commandé" in arme.attributes["raison_desarmement"]
-    assert _decision(hass).state == "Système désarmé"
+    assert _decision(hass).state == "Arrêt de sécurité – vérification requise"
     # aucune commande tant que désarmé
     on.clear()
     await _tick(hass, freezer, timedelta(minutes=5))
@@ -164,7 +164,7 @@ async def test_alarm_disarms_and_blocks_rearm(hass, freezer, monkeypatch, hass_a
     entry, on, off = await _setup(hass, freezer, monkeypatch, _local(hass, 9, 0))
     hass.states.async_set("binary_sensor.shelly_a_input", "on")
     await hass.async_block_till_done()
-    assert _decision(hass).state == "Alarme désenfumage"
+    assert _decision(hass).state == "Alarme incendie"
     assert hass.states.get(f"switch.{PREFIX}_systeme_arme").state == "off"
     with pytest.raises(HomeAssistantError):
         await hass.services.async_call(
@@ -178,10 +178,10 @@ async def test_power_cut_and_maintenance(hass, freezer, monkeypatch):
     hass.states.async_set("switch.shelly_a", "unavailable")
     hass.states.async_set("switch.shelly_b", "unavailable")
     await hass.async_block_till_done()
-    assert _decision(hass).state == "Maintenance"
+    assert _decision(hass).state == "Maintenance en cours"
     hass.states.async_set("sensor.ups_status", "OB DISCHRG")
     await hass.async_block_till_done()
-    assert _decision(hass).state == "Coupure secteur"
+    assert _decision(hass).state == "Coupure de courant"
 
 
 async def test_fault_relay_closes(hass, freezer, monkeypatch):
@@ -189,7 +189,7 @@ async def test_fault_relay_closes(hass, freezer, monkeypatch):
     hass.states.async_set("binary_sensor.shelly_b_input", "off")  # contact NF ouvert
     await hass.async_block_till_done()
     await _tick(hass, freezer, timedelta(seconds=40))  # anti-rebond
-    assert _decision(hass).state == "Défaut"
+    assert _decision(hass).state == "Défaut de l'installation"
 
 
 async def test_permission_required_to_arm(hass, freezer, monkeypatch, hass_admin_user, hass_read_only_user):
@@ -218,12 +218,12 @@ async def test_heat_mode_night_ventilation(hass, freezer, monkeypatch):
     end = dt_util.parse_datetime(attrs["fenetre_nocturne_fin"])
     now = dt_util.utcnow()
     assert start <= now < end
-    assert _decision(hass).state == "Ventilation"
+    assert _decision(hass).state == "Ventilation automatique"
     assert [c.data["entity_id"] for c in on][-1] == "switch.shelly_a"
     # la cage est refroidie : arrêt et fermeture
     hass.states.async_set("sensor.cage_temp", "19.8")
     await hass.async_block_till_done()
-    assert _decision(hass).state == "Par défaut (fermé)"
+    assert _decision(hass).state == "Au repos – fermé"
     assert "Cible atteinte" in _decision(hass).attributes["ventilation"]
     assert [c.data["entity_id"] for c in on][-1] == "switch.shelly_b"
 
@@ -232,15 +232,15 @@ async def test_station_failure(hass, freezer, monkeypatch):
     entry, on, off = await _setup(hass, freezer, monkeypatch, _local(hass, 9, 0))
     hass.states.async_set("sensor.ws90_gust", "unavailable")
     await hass.async_block_till_done()
-    assert _decision(hass).state == "Panne station météo"
+    assert _decision(hass).state == "Station météo hors service"
     hass.states.async_set("sensor.ws90_gust", "5", {"unit_of_measurement": "m/s"})
     await hass.async_block_till_done()
-    assert _decision(hass).state == "Par défaut (fermé)"
+    assert _decision(hass).state == "Au repos – fermé"
     # plus de données pendant 20 min : station considérée en panne
     freezer.tick(timedelta(minutes=20))
     async_fire_time_changed(hass, dt_util.utcnow())
     await hass.async_block_till_done()
-    assert _decision(hass).state == "Panne station météo"
+    assert _decision(hass).state == "Station météo hors service"
     assert "sans mise à jour" in _decision(hass).attributes["station_meteo"]
 
 
@@ -300,3 +300,17 @@ async def test_card_entity_map(hass, freezer, monkeypatch):
     assert ent["close_button"] == f"button.{PREFIX}_fermer"
     assert ent["resume_button"] == f"button.{PREFIX}_retour_en_automatique"
     assert ent["season"] == f"sensor.{PREFIX}_mode_saisonnier"
+
+
+async def test_manual_buttons_blocked_from_level_4(hass, freezer, monkeypatch):
+    entry, on, off = await _setup(hass, freezer, monkeypatch, _local(hass, 9, 0))
+    hass.states.async_set("sensor.ws90_rain", "2")
+    await hass.async_block_till_done()
+    assert _decision(hass).state == "Protection pluie / vent"
+    for name in ("ouvrir", "fermer"):
+        with pytest.raises(HomeAssistantError, match="Commande impossible"):
+            await hass.services.async_call("button", "press", {"entity_id": f"button.{PREFIX}_{name}"}, blocking=True)
+    # le retour en automatique reste possible
+    await hass.services.async_call(
+        "button", "press", {"entity_id": f"button.{PREFIX}_retour_en_automatique"}, blocking=True
+    )

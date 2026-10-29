@@ -9,7 +9,10 @@
  * sont lues dans l'attribut « entites » du capteur de décision.
  */
 
-const CARD_VERSION = "0.3.2";
+const CARD_VERSION = "0.4.0";
+
+const MAX_ANGLE = 120; // ouverture maximale de la coupole (°)
+const MANUAL_BLOCK_PRIORITY = 4; // boutons Ouvrir / Fermer bloqués à partir de ce niveau
 
 const LEVEL_COLORS = {
   alarme: "var(--error-color, #db4437)",
@@ -25,8 +28,8 @@ const LEVEL_COLORS = {
 };
 
 const SHORT_LABEL = {
-  alarme: "Alarme", desarme: "Désarmé", coupure: "Coupure", maintenance: "Maint.", defaut: "Défaut",
-  station: "Station", meteo: "Météo", manuel: "Manuel", ventilation: "Ventil.", defaut_ferme: "Fermé",
+  alarme: "Alarme", desarme: "Arrêt", coupure: "Courant", maintenance: "Maint.", defaut: "Défaut",
+  station: "Station", meteo: "Météo", manuel: "Manuel", ventilation: "Ventil.", defaut_ferme: "Repos",
 };
 
 const SEASON_LABEL = { froid: "Froid", normal: "Normal", canicule: "Canicule" };
@@ -54,6 +57,11 @@ function fmt(v, unit, digits = 1) {
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function isArmedFor(hass, ent) {
+  const s = ent && ent.armed_switch ? hass.states[ent.armed_switch] : null;
+  return s ? s.state === "on" : true;
 }
 
 class VentilationDesenfumageCard extends HTMLElement {
@@ -143,7 +151,7 @@ class VentilationDesenfumageCard extends HTMLElement {
     const isOpen = doorKnown && door.state === "on";
     const tilt = num(this._st("door_tilt"));
     let angle = 0;
-    if (isOpen) angle = tilt !== null ? Math.max(25, Math.min(90, tilt)) : 45;
+    if (isOpen) angle = tilt !== null ? Math.max(15, Math.min(MAX_ANGLE, tilt)) : 45;
     const doorText = !doorKnown ? "État inconnu" : isOpen ? (tilt !== null ? `Ouvert ${Math.round(tilt)}°` : "Ouvert") : "Fermé";
 
     // --- Mesures
@@ -162,6 +170,11 @@ class VentilationDesenfumageCard extends HTMLElement {
     const alarm = key === "alarme";
     const sun = hass.states["sun.sun"];
     const night = sun ? sun.state === "below_horizon" : false;
+
+    // --- Boutons manuels : bloqués si système désarmé ou niveau prioritaire actif
+    const prio = Number(a.priorite ?? 0);
+    const manualOk = isArmedFor(hass, ent) && prio < MANUAL_BLOCK_PRIORITY;
+    const manualWhy = manualOk ? "" : `Commande impossible : ${dec.state}`;
 
     // --- Chips
     const armed = hass.states[ent.armed_switch];
@@ -230,7 +243,7 @@ class VentilationDesenfumageCard extends HTMLElement {
 
           <!-- intérieur : niveau 4 et moitié du niveau 3 -->
           <rect x="22" y="${ROOF_Y}" width="356" height="${260 - ROOF_Y}" class="inside"/>
-          <text x="32" y="${ROOF_Y + 24}" class="cap">Niveau 4</text>
+          <text x="32" y="${FLOOR4_Y - 6}" class="cap">Niveau 4</text>
           <text x="${stairEndX + 20}" y="${FLOOR4_Y + 26}" class="cap">Niveau 3</text>
 
           <!-- escalier (monte de gauche à droite jusqu'au niveau 4) -->
@@ -295,8 +308,8 @@ class VentilationDesenfumageCard extends HTMLElement {
           </g>
 
           <g class="lbl door" data-mi="door">
-            <rect x="14" y="44" width="88" height="22" rx="11"/>
-            <text x="58" y="59" text-anchor="middle" class="small b">${esc(doorText)}</text>
+            <rect x="28" y="${ROOF_Y + 12}" width="88" height="22" rx="11"/>
+            <text x="72" y="${ROOF_Y + 27}" text-anchor="middle" class="small b">${esc(doorText)}</text>
           </g>
 
           ${!isArmed ? `<g class="stamp"><rect x="230" y="222" width="140" height="26" rx="13"/><text x="300" y="240" text-anchor="middle">SYSTÈME DÉSARMÉ</text></g>` : ""}
@@ -314,8 +327,8 @@ class VentilationDesenfumageCard extends HTMLElement {
         ${this._config.show_pipeline ? `<div class="pipe">${pipeline}</div>` : ""}
 
         ${this._config.show_buttons ? `<div class="btns">
-          <button class="open" data-act="open" ${isArmed ? "" : "disabled"}><ha-icon icon="mdi:arrow-up-bold"></ha-icon>Ouvrir</button>
-          <button class="close" data-act="close" ${isArmed ? "" : "disabled"}><ha-icon icon="mdi:arrow-down-bold"></ha-icon>Fermer</button>
+          <button class="open" data-act="open" ${manualOk ? "" : "disabled"} title="${esc(manualWhy)}"><ha-icon icon="mdi:arrow-up-bold"></ha-icon>Ouvrir</button>
+          <button class="close" data-act="close" ${manualOk ? "" : "disabled"} title="${esc(manualWhy)}"><ha-icon icon="mdi:arrow-down-bold"></ha-icon>Fermer</button>
           <button class="auto" data-act="auto" ${ovText ? "" : "disabled"}><ha-icon icon="mdi:autorenew"></ha-icon>Auto</button>
         </div>` : ""}
       </ha-card>`;

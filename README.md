@@ -15,18 +15,21 @@ complète est visible dans le dashboard.
 
 ## Pipeline de décision
 
+Les boutons **Ouvrir / Fermer** sont refusés à partir du niveau 4 (et grisés dans la carte).
+Pour les automatisations, comparer l'attribut `cle` du capteur de décision plutôt que son texte.
+
 | Prio | Niveau | Condition | Action |
 |---:|---|---|---|
-| 10 | Alarme désenfumage | Entrée SW du Shelly A active (relais X2.5) | Aucun ordre, désarmement |
-| 9 | Système désarmé | Mouvement non commandé, alarme, ou désarmement manuel | Aucun ordre jusqu'au réarmement |
-| 8 | Coupure secteur | Les deux Shelly hors ligne **et** onduleur sur batterie | Attente (la centrale ferme, S1.6) |
-| 7 | Maintenance | Les deux Shelly hors ligne, secteur présent (interrupteur à clé) | Attente |
-| 6 | Défaut | Entrée SW du Shelly B inactive (relais X2.8 ouvert) ou un seul Shelly hors ligne | Fermer + notification |
-| 5 | Panne station météo | Température, pluie ou rafales indisponibles ou trop anciennes | Fermer |
-| 4 | Météo défavorable | Pluie (+ attente de séchage), vent / rafales (+ attente), risque de précipitations | Fermer |
+| 10 | Alarme incendie | Entrée SW du Shelly A active (relais X2.5) | Aucun ordre, désarmement |
+| 9 | Arrêt de sécurité – vérification requise | Mouvement non commandé, alarme, ou désarmement manuel | Aucun ordre jusqu'au réarmement |
+| 8 | Coupure de courant | Les deux Shelly hors ligne **et** onduleur sur batterie | Attente (la centrale ferme, S1.6) |
+| 7 | Maintenance en cours | Les deux Shelly hors ligne, secteur présent (interrupteur à clé) | Attente |
+| 6 | Défaut de l'installation | Entrée SW du Shelly B inactive (relais X2.8 ouvert) ou un seul Shelly hors ligne | Fermer + notification |
+| 5 | Station météo hors service | Température, pluie ou rafales indisponibles ou trop anciennes | Fermer |
+| 4 | Protection pluie / vent | Pluie (+ attente de séchage), vent / rafales (+ attente), risque de précipitations | Fermer |
 | 3 | Commande manuelle | Bouton OUVRIR / FERMER du dashboard | Respectée pendant la durée réglée |
-| 2 | Ventilation | Selon le mode saisonnier (voir ci-dessous) | Ouvrir + maintien |
-| 0 | Par défaut | — | Fermer |
+| 2 | Ventilation automatique | Selon le mode saisonnier (voir ci-dessous) | Ouvrir + maintien |
+| 0 | Au repos – fermé | — | Fermer |
 
 ### Modes saisonniers (température extérieure moyenne sur 24 h)
 

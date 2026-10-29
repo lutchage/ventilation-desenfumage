@@ -89,6 +89,7 @@ _LOGGER = logging.getLogger(__name__)
 
 _INVALID = (None, STATE_UNAVAILABLE, STATE_UNKNOWN, "")
 MAX_CLOSE_RETRIES = 3
+MANUAL_BLOCK_PRIORITY = 4  # boutons Ouvrir / Fermer bloqués à partir de ce niveau
 
 
 class VentilationCoordinator(DataUpdateCoordinator[Decision]):
@@ -614,6 +615,8 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
         """Commande manuelle OUVRIR / FERMER depuis le dashboard."""
         if not self.settings.armed:
             raise HomeAssistantError("Système désarmé : réarmer avant de commander l'ouvrant")
+        if self.data is not None and self.data.priority >= MANUAL_BLOCK_PRIORITY:
+            raise HomeAssistantError(f"Commande impossible : {self.data.label}")
         name = await self._user_name(context)
         until = dt_util.utcnow() + timedelta(hours=self.settings.override_hours)
         self.override = Override(target, until, name)
