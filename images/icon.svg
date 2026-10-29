@@ -1,23 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="30 52 452 452">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="53 110 406 406">
   <defs>
     <marker id="ah" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="2.6" markerHeight="2.6" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 Z" fill="#1E88E5"/>
     </marker>
   </defs>
-  <g fill="none" stroke="#455A64" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
-    <!-- toit avec ouverture -->
-    <polyline points="52,286 256,104 286,131"/>
-    <polyline points="392,226 460,286"/>
-    <!-- murs -->
-    <polyline points="104,240 104,464 408,464 408,240"/>
+  <g fill="none" stroke="#455A64" stroke-linecap="round" stroke-linejoin="round">
+    <!-- murs et acrotères -->
+    <polyline points="72,232 72,468 440,468 440,232" stroke-width="30"/>
+    <!-- dalle avec trémie -->
+    <line x1="72" y1="262" x2="226" y2="262" stroke-width="28"/>
+    <line x1="318" y1="262" x2="440" y2="262" stroke-width="28"/>
+    <!-- costière -->
+    <line x1="226" y1="262" x2="226" y2="222" stroke-width="22"/>
+    <line x1="318" y1="262" x2="318" y2="222" stroke-width="22"/>
     <!-- escalier -->
-    <polyline points="160,464 160,416 216,416 216,368 272,368 272,320 328,320" stroke-width="22"/>
+    <polyline points="128,468 128,424 176,424 176,380 224,380 224,336 272,336" stroke-width="22"/>
   </g>
-  <!-- ouvrant relevé -->
-  <line x1="392" y1="226" x2="418" y2="96" stroke="#FB8C00" stroke-width="30" stroke-linecap="round"/>
+  <!-- coupole relevée (charnière à droite) -->
+  <g transform="rotate(26 318 222)">
+    <path d="M222 222 A48 50 0 0 1 318 222 Z" fill="#FFE0B2" stroke="#FB8C00" stroke-width="18" stroke-linejoin="round"/>
+  </g>
   <!-- flux d'air -->
   <g fill="none" stroke="#1E88E5" stroke-width="20" stroke-linecap="round" marker-end="url(#ah)">
-    <path d="M300 290 C 300 220, 330 190, 330 110"/>
-    <path d="M356 300 C 356 230, 376 200, 372 140"/>
+    <path d="M232 332 C230 276 204 232 156 196"/>
+    <path d="M272 330 C270 270 246 214 196 168"/>
   </g>
 </svg>

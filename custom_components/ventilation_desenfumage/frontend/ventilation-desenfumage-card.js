@@ -9,7 +9,7 @@
  * sont lues dans l'attribut « entites » du capteur de décision.
  */
 
-const CARD_VERSION = "0.3.0";
+const CARD_VERSION = "0.3.1";
 
 const LEVEL_COLORS = {
   alarme: "var(--error-color, #db4437)",
@@ -32,10 +32,12 @@ const SHORT_LABEL = {
 const SEASON_LABEL = { froid: "Froid", normal: "Normal", canicule: "Canicule" };
 const SEASON_ICON = { froid: "mdi:snowflake", normal: "mdi:weather-partly-cloudy", canicule: "mdi:white-balance-sunny" };
 
-// Géométrie de la scène (viewBox 400 x 240)
-const HINGE = { x: 252, y: 70 }; // charnière haute de l'ouvrant
-const SASH_LEN = 66;
-const ROOF_ANGLE = Math.atan2(85, 170); // pente du toit (rad)
+// Géométrie de la scène (viewBox 400 x 240) : toit plat, coupole sur costière
+const ROOF_Y = 136; // dessus de la dalle
+const DOME_L = 172; // bord gauche de la costière
+const DOME_R = 248; // bord droit = charnière de la coupole
+const DOME_Y = 116; // haut de la costière (appui de la coupole)
+const DOME_H = 26; // hauteur de la coupole
 
 function num(st) {
   if (!st || ["unknown", "unavailable", ""].includes(st.state)) return null;
@@ -171,10 +173,11 @@ class VentilationDesenfumageCard extends HTMLElement {
       if (!isNaN(d)) ovText = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     }
 
-    // --- Ouvrant (rotation autour de la charnière, vers le haut)
-    const rad = ROOF_ANGLE - (angle * Math.PI) / 180;
-    const sashEnd = { x: HINGE.x + SASH_LEN * Math.cos(rad), y: HINGE.y + SASH_LEN * Math.sin(rad) };
-    const gapEnd = { x: HINGE.x + SASH_LEN * Math.cos(ROOF_ANGLE), y: HINGE.y + SASH_LEN * Math.sin(ROOF_ANGLE) };
+    // --- Coupole : rotation autour de la charnière droite, le côté gauche se soulève
+    const rad = (angle * Math.PI) / 180;
+    const arm = 0.55 * (DOME_R - DOME_L); // point d'attache du vérin sur le cadre
+    const jackTop = { x: DOME_R - arm * Math.cos(rad), y: DOME_Y - arm * Math.sin(rad) };
+    const domeW = DOME_R - DOME_L;
 
     const pipeline = trace
       .map((t) => {
@@ -202,7 +205,7 @@ class VentilationDesenfumageCard extends HTMLElement {
               <stop offset="0" stop-color="${night ? "#1b2440" : "#9fd3f5"}"/>
               <stop offset="1" stop-color="${night ? "#2e3b63" : "#dff1fc"}"/>
             </linearGradient>
-            <clipPath id="inside"><path d="M64 112 L200 44 L336 112 L336 240 L64 240 Z"/></clipPath>
+            <clipPath id="inside"><rect x="56" y="146" width="288" height="94"/></clipPath>
           </defs>
 
           <rect x="0" y="0" width="400" height="240" fill="url(#sky)" opacity="0.55"/>
@@ -217,33 +220,36 @@ class VentilationDesenfumageCard extends HTMLElement {
           ${raining ? `<g class="rain">${[20, 60, 100, 140, 300, 340, 380, 170, 240].map((x, i) =>
             `<line x1="${x}" y1="${-10 - (i % 3) * 25}" x2="${x - 6}" y2="${4 - (i % 3) * 25}" style="animation-delay:${(i * 0.17).toFixed(2)}s"/>`).join("")}</g>` : ""}
 
-          <!-- intérieur -->
-          <path d="M64 112 L200 44 L336 112 L336 240 L64 240 Z" class="inside"/>
+          <!-- intérieur (dernier étage) -->
+          <rect x="50" y="146" width="300" height="94" class="inside"/>
           <g clip-path="url(#inside)">
-            <polyline class="stairs" points="90,240 90,214 132,214 132,188 174,188 174,162 216,162 216,136 250,136"/>
+            <polyline class="stairs" points="66,240 66,218 100,218 100,194 134,194 134,170 ${DOME_L + 4},170 ${DOME_L + 4},150"/>
           </g>
 
-          <!-- toit (interrompu au droit de l'ouvrant) et murs -->
-          <polyline class="roof" points="30,129 200,44 ${HINGE.x},${HINGE.y}"/>
-          <polyline class="roof" points="${gapEnd.x.toFixed(1)},${gapEnd.y.toFixed(1)} 370,129"/>
-          <polyline class="wall" points="64,112 64,240"/>
-          <polyline class="wall" points="336,112 336,240"/>
+          <!-- dalle (trémie sous la coupole), acrotères et murs -->
+          <polyline class="roof" points="40,${ROOF_Y + 5} ${DOME_L},${ROOF_Y + 5}"/>
+          <polyline class="roof" points="${DOME_R},${ROOF_Y + 5} 360,${ROOF_Y + 5}"/>
+          <polyline class="wall" points="44,${ROOF_Y - 12} 44,240"/>
+          <polyline class="wall" points="356,${ROOF_Y - 12} 356,240"/>
+          <!-- costière -->
+          <polyline class="curb" points="${DOME_L + 3},${ROOF_Y + 9} ${DOME_L + 3},${DOME_Y}"/>
+          <polyline class="curb" points="${DOME_R - 3},${ROOF_Y + 9} ${DOME_R - 3},${DOME_Y}"/>
 
-          <!-- cadre de l'ouverture -->
-          <line class="frame" x1="${HINGE.x}" y1="${HINGE.y}" x2="${gapEnd.x.toFixed(1)}" y2="${gapEnd.y.toFixed(1)}"/>
           <!-- vérin -->
-          <line class="jack" x1="${(HINGE.x + gapEnd.x) / 2 - 4}" y1="${(HINGE.y + gapEnd.y) / 2 + 22}"
-                x2="${(HINGE.x * 0.4 + sashEnd.x * 0.6).toFixed(1)}" y2="${(HINGE.y * 0.4 + sashEnd.y * 0.6).toFixed(1)}"/>
+          <line class="jack" x1="${DOME_L + 10}" y1="${ROOF_Y + 2}" x2="${jackTop.x.toFixed(1)}" y2="${jackTop.y.toFixed(1)}"/>
 
-          <!-- ouvrant -->
-          <line class="sash ${doorKnown ? "" : "unknown"}" style="stroke:${isOpen ? "#fb8c00" : "var(--secondary-text-color,#727272)"}"
-                x1="${HINGE.x}" y1="${HINGE.y}" x2="${sashEnd.x.toFixed(1)}" y2="${sashEnd.y.toFixed(1)}"/>
-          <circle cx="${HINGE.x}" cy="${HINGE.y}" r="4" class="hinge"/>
+          <!-- coupole -->
+          <g class="dome ${isOpen ? "open" : ""} ${doorKnown ? "" : "unknown"}" transform="rotate(${angle} ${DOME_R} ${DOME_Y})">
+            <path d="M${DOME_L} ${DOME_Y} A${domeW / 2} ${DOME_H} 0 0 1 ${DOME_R} ${DOME_Y} Z"/>
+            <line x1="${DOME_L - 2}" y1="${DOME_Y}" x2="${DOME_R + 2}" y2="${DOME_Y}" class="rim"/>
+            <path d="M${DOME_L + 16} ${DOME_Y - 8} Q${DOME_L + 24} ${DOME_Y - DOME_H + 4} ${DOME_L + 40} ${DOME_Y - DOME_H + 2}" class="shine"/>
+          </g>
+          <circle cx="${DOME_R}" cy="${DOME_Y}" r="3.5" class="hinge"/>
 
           ${isOpen ? `<g class="air">
-              <path d="M262 190 C262 150 278 120 286 40"/>
-              <path d="M290 196 C290 156 300 126 312 52"/>
-              <path d="M236 184 C240 146 258 116 262 30"/>
+              <path d="M196 214 C196 170 196 140 170 40"/>
+              <path d="M218 220 C218 176 214 146 196 54"/>
+              <path d="M176 206 C176 170 172 140 146 66"/>
             </g>` : ""}
 
           <!-- étiquettes -->
@@ -255,15 +261,15 @@ class VentilationDesenfumageCard extends HTMLElement {
           </g>
 
           <g class="lbl" data-mi="indoor_temp">
-            <rect x="96" y="96" width="76" height="${hIn !== null ? 52 : 38}" rx="6"/>
-            <text x="134" y="109" text-anchor="middle" class="cap">Cage d'escalier</text>
-            <text x="134" y="126" text-anchor="middle" class="big">${fmt(tIn, "°")}</text>
-            ${hIn !== null ? `<text x="134" y="141" text-anchor="middle" class="small">${fmt(hIn, " %", 0)}</text>` : ""}
+            <rect x="262" y="164" width="80" height="${hIn !== null ? 52 : 38}" rx="6"/>
+            <text x="302" y="177" text-anchor="middle" class="cap">Cage d'escalier</text>
+            <text x="302" y="194" text-anchor="middle" class="big">${fmt(tIn, "°")}</text>
+            ${hIn !== null ? `<text x="302" y="209" text-anchor="middle" class="small">${fmt(hIn, " %", 0)}</text>` : ""}
           </g>
 
           <g class="lbl door" data-mi="door">
-            <rect x="${isOpen ? 300 : 286}" y="${isOpen ? 70 : 60}" width="84" height="22" rx="11"/>
-            <text x="${isOpen ? 342 : 328}" y="${isOpen ? 85 : 75}" text-anchor="middle" class="small b">${esc(doorText)}</text>
+            <rect x="262" y="88" width="88" height="22" rx="11"/>
+            <text x="306" y="103" text-anchor="middle" class="small b">${esc(doorText)}</text>
           </g>
 
           ${!isArmed ? `<g class="stamp"><rect x="110" y="6" width="180" height="26" rx="13"/><text x="200" y="24" text-anchor="middle">SYSTÈME DÉSARMÉ</text></g>` : ""}
@@ -310,13 +316,17 @@ const STYLE = `
   .t2 { font-size:13px; color:var(--secondary-text-color); line-height:1.35; }
   .scene { width:100%; height:auto; display:block; margin:10px 0 6px; border-radius:12px; }
   .inside { fill: var(--secondary-background-color, #f2f2f2); }
-  .roof { fill:none; stroke: var(--primary-text-color,#212121); stroke-width:9; stroke-linecap:round; stroke-linejoin:round; opacity:.8; }
-  .wall { fill:none; stroke: var(--primary-text-color,#212121); stroke-width:8; opacity:.8; }
+  .roof { fill:none; stroke: var(--primary-text-color,#212121); stroke-width:10; stroke-linecap:butt; opacity:.8; }
+  .wall { fill:none; stroke: var(--primary-text-color,#212121); stroke-width:10; opacity:.8; }
   .stairs { fill:none; stroke: var(--secondary-text-color,#727272); stroke-width:6; stroke-linejoin:round; opacity:.6; }
-  .sash { stroke-width:9; stroke-linecap:round; transition: all .6s; }
-  .sash.unknown { stroke-dasharray: 6 6; }
+  .curb { fill:none; stroke: var(--primary-text-color,#212121); stroke-width:6; opacity:.8; }
+  .dome path:first-child { fill: rgba(160,205,235,.45); stroke: var(--secondary-text-color,#727272); stroke-width:3; }
+  .dome .rim { stroke: var(--secondary-text-color,#727272); stroke-width:6; stroke-linecap:round; }
+  .dome .shine { fill:none; stroke:#fff; stroke-width:3; stroke-linecap:round; opacity:.7; }
+  .dome.open path:first-child { stroke:#fb8c00; }
+  .dome.open .rim { stroke:#fb8c00; }
+  .dome.unknown path:first-child, .dome.unknown .rim { stroke-dasharray: 5 5; }
   .hinge { fill: var(--primary-text-color,#212121); }
-  .frame { stroke: var(--secondary-text-color,#727272); stroke-width:3; stroke-dasharray:3 4; opacity:.7; }
   .jack { stroke: var(--secondary-text-color,#727272); stroke-width:4; stroke-linecap:round; }
   .air path { fill:none; stroke:#1e88e5; stroke-width:4; stroke-linecap:round; stroke-dasharray: 10 12; animation: flow 1.2s linear infinite; opacity:.85; }
   @keyframes flow { to { stroke-dashoffset:-22; } }
