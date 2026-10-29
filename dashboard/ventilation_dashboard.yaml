@@ -1,0 +1,274 @@
+# Dashboard « Ventilation cage d'escalier »
+#
+# Installation : Paramètres > Tableaux de bord > Ajouter un tableau de bord >
+# « Partir de zéro », puis menu ⋮ > Modifier > ⋮ > Éditeur de configuration brute,
+# et coller ce fichier.
+#
+# À ADAPTER avant de coller :
+#   1. Les entités de VOTRE installation, repérées par « # À ADAPTER »
+#      (capteur d'ouverture, températures, WS90, onduleur).
+#   2. Les identifiants des utilisateurs autorisés (« ID_UTILISATEUR_1 »…) :
+#      Paramètres > Personnes > Utilisateurs > cliquer sur l'utilisateur, l'ID est affiché.
+#   3. Si vous avez donné un autre nom que « Ventilation désenfumage » à l'intégration,
+#      remplacez le préfixe « ventilation_desenfumage_ » des entités.
+
+title: Ventilation
+views:
+  - title: Ouvrant
+    path: ouvrant
+    icon: mdi:window-open-variant
+    type: sections
+    max_columns: 3
+    sections:
+      # ------------------------------------------------------------------
+      # Vue d'ensemble
+      # ------------------------------------------------------------------
+      - type: grid
+        cards:
+          - type: heading
+            heading: Ouvrant cage d'escalier
+            heading_style: title
+            icon: mdi:stairs
+          - type: markdown
+            text_only: true
+            content: >-
+              {% set door = 'binary_sensor.ouvrant_cage_escalier' %}{# À ADAPTER #}
+              {% set tilt = 'sensor.ouvrant_cage_escalier_angle' %}{# À ADAPTER (optionnel) #}
+              {% set d = 'sensor.ventilation_desenfumage_decision' %}
+              {% set ouvert = is_state(door, 'on') %}
+              {% set inconnu = states(door) in ['unavailable', 'unknown'] %}
+              <ha-alert alert-type="{{ 'info' if inconnu else ('warning' if ouvert else 'success') }}">
+              <ha-icon icon="{{ 'mdi:help-box' if inconnu else ('mdi:window-open-variant' if ouvert else 'mdi:window-closed-variant') }}"></ha-icon>
+              <b>{{ 'État inconnu' if inconnu else ('OUVERT' if ouvert else 'FERMÉ') }}</b>
+              {% if has_value(tilt) and ouvert %} – angle {{ states(tilt) }}°{% endif %}
+              </ha-alert>
+
+              **Décision : {{ states(d) }}** (priorité {{ state_attr(d, 'priorite') }})
+              {{ state_attr(d, 'raison') }}
+
+              {% if not is_state('switch.ventilation_desenfumage_systeme_arme', 'on') %}
+              <ha-alert alert-type="error">Système désarmé : {{ state_attr('switch.ventilation_desenfumage_systeme_arme', 'raison_desarmement') }}</ha-alert>
+              {% endif %}
+          - type: tile
+            entity: sensor.ventilation_desenfumage_mode_saisonnier
+            name: Mode
+          - type: tile
+            entity: sensor.ventilation_desenfumage_temperature_exterieure_moyenne_24_h
+            name: Moyenne ext. 24 h
+
+      # ------------------------------------------------------------------
+      # Commandes
+      # ------------------------------------------------------------------
+      - type: grid
+        cards:
+          - type: heading
+            heading: Commandes
+            icon: mdi:gesture-tap-button
+          - type: tile
+            entity: button.ventilation_desenfumage_ouvrir
+            name: OUVRIR
+            color: orange
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.ventilation_desenfumage_ouvrir
+              confirmation:
+                text: Ouvrir l'ouvrant ? La commande manuelle reste prioritaire pendant la durée réglée.
+          - type: tile
+            entity: button.ventilation_desenfumage_fermer
+            name: FERMER
+            color: blue
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.ventilation_desenfumage_fermer
+          - type: tile
+            entity: button.ventilation_desenfumage_retour_en_automatique
+            name: Retour en auto
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.ventilation_desenfumage_retour_en_automatique
+          - type: tile
+            entity: sensor.ventilation_desenfumage_fin_de_la_commande_manuelle
+            name: Retour auto prévu
+          - type: tile
+            entity: number.ventilation_desenfumage_duree_de_la_commande_manuelle
+            name: Durée commande manuelle
+            features:
+              - type: numeric-input
+                style: buttons
+          - type: tile
+            entity: switch.ventilation_desenfumage_mode_ventilation
+            name: Mode ventilation
+            features:
+              - type: toggle
+          - type: tile
+            entity: select.ventilation_desenfumage_choix_du_mode
+            name: Choix du mode
+            features:
+              - type: select-options
+
+          # Système armé : visible et modifiable seulement par les utilisateurs autorisés.
+          # L'intégration vérifie aussi les droits (options de l'intégration).
+          - type: tile
+            entity: switch.ventilation_desenfumage_systeme_arme
+            name: Système armé
+            color: green
+            tap_action:
+              action: toggle
+              confirmation:
+                text: >-
+                  Confirmer le changement d'état du système. Avant de réarmer, vérifiez
+                  l'installation (ouvrant, centrale, câblage).
+            visibility:
+              - condition: user
+                users:
+                  - ID_UTILISATEUR_1 # À ADAPTER
+                  - ID_UTILISATEUR_2 # À ADAPTER
+
+      # ------------------------------------------------------------------
+      # Sécurité et état de l'installation
+      # ------------------------------------------------------------------
+      - type: grid
+        cards:
+          - type: heading
+            heading: Sécurité
+            icon: mdi:shield-alert
+          - type: glance
+            show_state: false
+            columns: 4
+            entities:
+              - entity: binary_sensor.ventilation_desenfumage_alarme_desenfumage
+                name: Alarme
+              - entity: binary_sensor.ventilation_desenfumage_defaut
+                name: Défaut
+              - entity: binary_sensor.ventilation_desenfumage_coupure_secteur
+                name: Coupure
+              - entity: binary_sensor.ventilation_desenfumage_maintenance
+                name: Maintenance
+              - entity: binary_sensor.ventilation_desenfumage_panne_station_meteo
+                name: Station
+              - entity: binary_sensor.ventilation_desenfumage_meteo_defavorable
+                name: Météo
+              - entity: binary_sensor.ventilation_desenfumage_commande_manuelle_active
+                name: Manuel
+              - entity: binary_sensor.ventilation_desenfumage_demande_de_ventilation
+                name: Ventilation
+          - type: entities
+            title: Capteurs
+            entities:
+              - entity: binary_sensor.ouvrant_cage_escalier # À ADAPTER
+                name: Ouvrant
+              - entity: sensor.ouvrant_cage_escalier_angle # À ADAPTER (optionnel)
+                name: Angle
+              - entity: sensor.cage_escalier_temperature # À ADAPTER
+                name: Température cage
+              - entity: sensor.cage_escalier_humidite # À ADAPTER
+                name: Humidité cage
+              - entity: sensor.ws90_temperature # À ADAPTER
+                name: Température extérieure
+              - entity: sensor.ws90_humidite # À ADAPTER
+                name: Humidité extérieure
+              - entity: sensor.ws90_intensite_pluie # À ADAPTER
+                name: Pluie
+              - entity: sensor.ws90_rafales # À ADAPTER
+                name: Rafales
+              - entity: sensor.onduleur_etat # À ADAPTER
+                name: Onduleur
+              - entity: switch.shelly_ouvrir # À ADAPTER
+                name: Shelly OUVRIR
+              - entity: switch.shelly_fermer # À ADAPTER
+                name: Shelly FERMER
+
+      # ------------------------------------------------------------------
+      # Trace de décision et journal
+      # ------------------------------------------------------------------
+      - type: grid
+        cards:
+          - type: heading
+            heading: Pourquoi cette décision ?
+            icon: mdi:sitemap
+          - type: markdown
+            content: >-
+              {% set trace = state_attr('sensor.ventilation_desenfumage_decision', 'trace') or [] %}
+              | Prio | Niveau | Actif | Raison |
+              |:--:|:--|:--:|:--|
+              {% for t in trace -%}
+              | {{ t.priority }} | {{ '**' ~ t.label ~ '**' if t.active else t.label }} | {{ '●' if t.active else '' }} | {{ t.reason }} |
+              {% endfor %}
+          - type: markdown
+            title: Journal
+            content: >-
+              {% for e in (state_attr('sensor.ventilation_desenfumage_dernier_evenement', 'journal') or [])[:10] -%}
+              - {{ as_timestamp(e.time) | timestamp_custom('%d.%m %H:%M') }} – {{ e.message }}
+              {% endfor %}
+          - type: history-graph
+            title: 24 dernières heures
+            hours_to_show: 24
+            entities:
+              - entity: binary_sensor.ouvrant_cage_escalier # À ADAPTER
+                name: Ouvrant
+              - entity: sensor.ventilation_desenfumage_decision
+                name: Décision
+              - entity: sensor.cage_escalier_temperature # À ADAPTER
+                name: Intérieur
+              - entity: sensor.ws90_temperature # À ADAPTER
+                name: Extérieur
+
+  # --------------------------------------------------------------------
+  # Réglages
+  # --------------------------------------------------------------------
+  - title: Réglages
+    path: reglages
+    icon: mdi:tune
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Choix du mode
+          - type: entities
+            entities:
+              - number.ventilation_desenfumage_seuil_mode_froid
+              - number.ventilation_desenfumage_seuil_mode_canicule
+              - number.ventilation_desenfumage_hysteresis_du_mode
+      - type: grid
+        cards:
+          - type: heading
+            heading: Mode canicule (nuit)
+          - type: entities
+            entities:
+              - number.ventilation_desenfumage_decalage_apres_le_coucher_du_soleil
+              - number.ventilation_desenfumage_duree_max_ventilation_nocturne
+              - number.ventilation_desenfumage_ecart_min_interieur_exterieur
+              - number.ventilation_desenfumage_hysteresis_de_l_ecart
+              - number.ventilation_desenfumage_temperature_interieure_min_canicule
+              - number.ventilation_desenfumage_temperature_interieure_cible
+              - switch.ventilation_desenfumage_plage_horaire_interdite
+              - time.ventilation_desenfumage_debut_de_la_plage_interdite
+              - time.ventilation_desenfumage_fin_de_la_plage_interdite
+      - type: grid
+        cards:
+          - type: heading
+            heading: Mode normal (aération)
+          - type: entities
+            entities:
+              - time.ventilation_desenfumage_heure_de_l_aeration_quotidienne
+              - number.ventilation_desenfumage_duree_de_l_aeration_quotidienne
+      - type: grid
+        cards:
+          - type: heading
+            heading: Météo
+          - type: entities
+            entities:
+              - number.ventilation_desenfumage_seuil_de_pluie
+              - number.ventilation_desenfumage_attente_apres_la_pluie
+              - number.ventilation_desenfumage_rafales_max
+              - number.ventilation_desenfumage_vent_moyen_max
+              - number.ventilation_desenfumage_attente_apres_le_vent
+              - number.ventilation_desenfumage_risque_de_precipitations_max

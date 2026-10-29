@@ -1,0 +1,77 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Smoke vent ventilation",
+        "description": "Select the installation entities.",
+        "data": {
+          "name": "Name",
+          "shelly_open": "Shelly A – OPEN relay",
+          "shelly_close": "Shelly B – CLOSE relay",
+          "alarm_input": "Shelly A SW input (alarm relay X2.5)",
+          "fault_input": "Shelly B SW input (fault relay X2.8)",
+          "door": "Window contact sensor",
+          "door_tilt": "Window tilt angle (optional)",
+          "indoor_temp": "Stairwell temperature",
+          "indoor_humidity": "Stairwell humidity (optional)",
+          "outdoor_temp": "Outdoor temperature (WS90)",
+          "outdoor_humidity": "Outdoor humidity (optional)",
+          "rain_rate": "Rain rate (WS90)",
+          "wind_gust": "Wind gust (WS90)",
+          "wind_speed": "Wind speed (optional)",
+          "precip_risk": "Precipitation risk % (optional)",
+          "ups": "UPS status"
+        }
+      },
+      "reconfigure": {
+        "title": "Change entities",
+        "data": {
+          "shelly_open": "Shelly A – OPEN relay",
+          "shelly_close": "Shelly B – CLOSE relay",
+          "alarm_input": "Shelly A SW input (alarm relay X2.5)",
+          "fault_input": "Shelly B SW input (fault relay X2.8)",
+          "door": "Window contact sensor",
+          "door_tilt": "Window tilt angle (optional)",
+          "indoor_temp": "Stairwell temperature",
+          "indoor_humidity": "Stairwell humidity (optional)",
+          "outdoor_temp": "Outdoor temperature (WS90)",
+          "outdoor_humidity": "Outdoor humidity (optional)",
+          "rain_rate": "Rain rate (WS90)",
+          "wind_gust": "Wind gust (WS90)",
+          "wind_speed": "Wind speed (optional)",
+          "precip_risk": "Precipitation risk % (optional)",
+          "ups": "UPS status"
+        }
+      }
+    },
+    "error": {
+      "same_shelly": "Both Shelly must be different."
+    },
+    "abort": {
+      "already_configured": "Already configured.",
+      "reconfigure_successful": "Configuration updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Technical options",
+        "data": {
+          "allowed_users": "Users allowed to arm / disarm (empty = admins)",
+          "pulse_s": "Pulse duration",
+          "keepalive_min": "OPEN keep-alive interval",
+          "central_timer_min": "Panel ventilation timer (S2.3)",
+          "travel_s": "Window travel time",
+          "close_retry_min": "Delay before CLOSE retry",
+          "resync_grace_s": "Resync grace period",
+          "stale_min": "Max weather data age",
+          "debounce_s": "Fault debounce",
+          "alarm_invert": "Invert alarm input",
+          "fault_invert": "Invert fault input",
+          "ups_battery_states": "UPS on-battery states (comma separated)",
+          "notify": "Persistent notifications"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Ventilation désenfumage",
+        "description": "Choisissez les entités de l'installation (Shelly, capteurs, station météo, onduleur).",
+        "data": {
+          "name": "Nom",
+          "shelly_open": "Shelly A – relais OUVRIR",
+          "shelly_close": "Shelly B – relais FERMER",
+          "alarm_input": "Entrée SW du Shelly A (relais alarme X2.5)",
+          "fault_input": "Entrée SW du Shelly B (relais défaut X2.8)",
+          "door": "Capteur d'ouverture de l'ouvrant",
+          "door_tilt": "Angle de l'ouvrant (optionnel)",
+          "indoor_temp": "Température cage d'escalier",
+          "indoor_humidity": "Humidité cage d'escalier (optionnel)",
+          "outdoor_temp": "Température extérieure (WS90)",
+          "outdoor_humidity": "Humidité extérieure (optionnel)",
+          "rain_rate": "Intensité de pluie (WS90)",
+          "wind_gust": "Rafales de vent (WS90)",
+          "wind_speed": "Vent moyen (optionnel)",
+          "precip_risk": "Risque de précipitations en % (optionnel)",
+          "ups": "État de l'onduleur"
+        }
+      },
+      "reconfigure": {
+        "title": "Modifier les entités",
+        "data": {
+          "shelly_open": "Shelly A – relais OUVRIR",
+          "shelly_close": "Shelly B – relais FERMER",
+          "alarm_input": "Entrée SW du Shelly A (relais alarme X2.5)",
+          "fault_input": "Entrée SW du Shelly B (relais défaut X2.8)",
+          "door": "Capteur d'ouverture de l'ouvrant",
+          "door_tilt": "Angle de l'ouvrant (optionnel)",
+          "indoor_temp": "Température cage d'escalier",
+          "indoor_humidity": "Humidité cage d'escalier (optionnel)",
+          "outdoor_temp": "Température extérieure (WS90)",
+          "outdoor_humidity": "Humidité extérieure (optionnel)",
+          "rain_rate": "Intensité de pluie (WS90)",
+          "wind_gust": "Rafales de vent (WS90)",
+          "wind_speed": "Vent moyen (optionnel)",
+          "precip_risk": "Risque de précipitations en % (optionnel)",
+          "ups": "État de l'onduleur"
+        }
+      }
+    },
+    "error": {
+      "same_shelly": "Les deux Shelly doivent être différents."
+    },
+    "abort": {
+      "already_configured": "Cet ouvrant est déjà configuré.",
+      "reconfigure_successful": "Configuration mise à jour."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options techniques",
+        "data": {
+          "allowed_users": "Utilisateurs autorisés à armer / désarmer (vide = administrateurs)",
+          "pulse_s": "Durée de l'impulsion",
+          "keepalive_min": "Intervalle de maintien OUVRIR",
+          "central_timer_min": "Temporisation de la centrale (S2.3)",
+          "travel_s": "Temps de course de l'ouvrant",
+          "close_retry_min": "Délai avant nouvel ordre FERMER",
+          "resync_grace_s": "Délai de resynchronisation",
+          "stale_min": "Délai max sans données météo",
+          "debounce_s": "Anti-rebond du défaut",
+          "alarm_invert": "Inverser l'entrée alarme",
+          "fault_invert": "Inverser l'entrée défaut",
+          "ups_battery_states": "États « sur batterie » de l'onduleur (séparés par des virgules)",
+          "notify": "Notifications persistantes"
+        }
+      }
+    }
+  }
+}

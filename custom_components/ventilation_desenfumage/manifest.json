@@ -1,0 +1,13 @@
+{
+  "domain": "ventilation_desenfumage",
+  "name": "Ventilation désenfumage",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["sun"],
+  "documentation": "https://github.com/",
+  "integration_type": "device",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/",
+  "requirements": [],
+  "version": "0.1.0"
+}
