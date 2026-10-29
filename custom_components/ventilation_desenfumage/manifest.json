@@ -1,13 +1,17 @@
 {
   "domain": "ventilation_desenfumage",
   "name": "Ventilation désenfumage",
-  "codeowners": [],
+  "codeowners": [
+    "@lutchage"
+  ],
   "config_flow": true,
-  "dependencies": ["sun"],
-  "documentation": "https://github.com/",
+  "dependencies": [
+    "sun"
+  ],
+  "documentation": "https://github.com/lutchage/ventilation-desenfumage",
   "integration_type": "device",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/",
+  "issue_tracker": "https://github.com/lutchage/ventilation-desenfumage/issues",
   "requirements": [],
   "version": "0.1.0"
 }

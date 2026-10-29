@@ -64,9 +64,8 @@ de Home Assistant ou le retour des Shelly (fin de maintenance ou de coupure).
 
 ### Via HACS (dépôt personnalisé)
 
-1. Publier ce dossier dans un dépôt GitHub.
-2. HACS > ⋮ > Dépôts personnalisés > URL du dépôt, catégorie « Intégration ».
-3. Installer « Ventilation désenfumage », redémarrer Home Assistant.
+1. HACS > ⋮ > Dépôts personnalisés > `https://github.com/lutchage/ventilation-desenfumage`, catégorie « Intégration ».
+2. Installer « Ventilation désenfumage », redémarrer Home Assistant.
 
 ### Manuellement
 
@@ -139,3 +138,7 @@ Types : `desarme`, `arme`, `defaut`, `temporisation`, `fermeture`, `manuel`, `mo
 4. Couper le 230 V de la centrale : niveau « Coupure secteur », fermeture par la centrale.
 5. Déclencher une alarme avec l'entreprise de maintenance : niveau « Alarme », aucun ordre.
 6. Débrancher la WS90 : niveau « Panne station météo » après le délai réglé.
+
+## Licence
+
+MIT – voir [LICENSE](LICENSE).
