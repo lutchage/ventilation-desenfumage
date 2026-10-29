@@ -1,3 +1,5 @@
+<img src="images/icon.png" alt="Ventilation désenfumage" width="128" align="right">
+
 # Ventilation désenfumage
 
 Intégration Home Assistant pour piloter la **ventilation** d'une cage d'escalier
@@ -150,6 +152,10 @@ Types : `desarme`, `arme`, `defaut`, `temporisation`, `fermeture`, `manuel`, `mo
 4. Couper le 230 V de la centrale : niveau « Coupure secteur », fermeture par la centrale.
 5. Déclencher une alarme avec l'entreprise de maintenance : niveau « Alarme », aucun ordre.
 6. Débrancher la WS90 : niveau « Panne station météo » après le délai réglé.
+
+## Icône
+
+L'icône est fournie dans `custom_components/ventilation_desenfumage/brand/` (versions claire et sombre). Home Assistant l'affiche automatiquement à partir de la version 2026.3. La source vectorielle est dans `images/icon.svg`.
 
 ## Licence
 

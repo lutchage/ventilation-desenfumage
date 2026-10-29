@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="30 52 452 452">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="2.6" markerHeight="2.6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#1E88E5"/>
+    </marker>
+  </defs>
+  <g fill="none" stroke="#455A64" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+    <!-- toit avec ouverture -->
+    <polyline points="52,286 256,104 286,131"/>
+    <polyline points="392,226 460,286"/>
+    <!-- murs -->
+    <polyline points="104,240 104,464 408,464 408,240"/>
+    <!-- escalier -->
+    <polyline points="160,464 160,416 216,416 216,368 272,368 272,320 328,320" stroke-width="22"/>
+  </g>
+  <!-- ouvrant relevé -->
+  <line x1="392" y1="226" x2="418" y2="96" stroke="#FB8C00" stroke-width="30" stroke-linecap="round"/>
+  <!-- flux d'air -->
+  <g fill="none" stroke="#1E88E5" stroke-width="20" stroke-linecap="round" marker-end="url(#ah)">
+    <path d="M300 290 C 300 220, 330 190, 330 110"/>
+    <path d="M356 300 C 356 230, 376 200, 372 140"/>
+  </g>
+</svg>
