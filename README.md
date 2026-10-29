@@ -136,7 +136,7 @@ show_buttons: true               # optionnel : boutons Ouvrir / Fermer / Auto
 
 ![Carte graphique](images/carte.png)
 
-Elle affiche une coupe du toit avec l'ouvrant à son angle réel (capteur d'inclinaison),
+Elle affiche une coupe de l'immeuble (milieu du niveau 3 jusqu'au toit plat) avec l'escalier, les panneaux solaires, le mât de la WS90 et la coupole à son angle réel (capteur d'inclinaison),
 le flux d'air quand l'ouvrant est ouvert, la pluie et le vent, le jour ou la nuit, les
 températures et humidités intérieures et extérieures, le mode saisonnier, l'état armé,
 la commande manuelle en cours, le niveau gagnant du pipeline et les boutons de commande.

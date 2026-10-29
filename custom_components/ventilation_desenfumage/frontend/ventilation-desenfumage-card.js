@@ -9,7 +9,7 @@
  * sont lues dans l'attribut « entites » du capteur de décision.
  */
 
-const CARD_VERSION = "0.3.1";
+const CARD_VERSION = "0.3.2";
 
 const LEVEL_COLORS = {
   alarme: "var(--error-color, #db4437)",
@@ -32,11 +32,14 @@ const SHORT_LABEL = {
 const SEASON_LABEL = { froid: "Froid", normal: "Normal", canicule: "Canicule" };
 const SEASON_ICON = { froid: "mdi:snowflake", normal: "mdi:weather-partly-cloudy", canicule: "mdi:white-balance-sunny" };
 
-// Géométrie de la scène (viewBox 400 x 240) : toit plat, coupole sur costière
-const ROOF_Y = 136; // dessus de la dalle
-const DOME_L = 172; // bord gauche de la costière
-const DOME_R = 248; // bord droit = charnière de la coupole
-const DOME_Y = 116; // haut de la costière (appui de la coupole)
+// Géométrie de la scène (viewBox 400 x 260) : coupe de l'immeuble du milieu du
+// niveau 3 jusqu'au toit plat. Escalier montant de gauche à droite jusqu'au
+// niveau 4, coupole au centre gauche avec charnière à gauche.
+const ROOF_Y = 104; // dessus de la dalle du toit
+const FLOOR4_Y = 184; // dessus de la dalle du niveau 4
+const DOME_L = 112; // bord gauche de la costière = charnière
+const DOME_R = 188; // bord droit de la costière
+const DOME_Y = 86; // haut de la costière (appui de la coupole)
 const DOME_H = 26; // hauteur de la coupole
 
 function num(st) {
@@ -173,11 +176,17 @@ class VentilationDesenfumageCard extends HTMLElement {
       if (!isNaN(d)) ovText = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     }
 
-    // --- Coupole : rotation autour de la charnière droite, le côté gauche se soulève
+    // --- Coupole : rotation autour de la charnière gauche, le côté droit se soulève
     const rad = (angle * Math.PI) / 180;
     const arm = 0.55 * (DOME_R - DOME_L); // point d'attache du vérin sur le cadre
-    const jackTop = { x: DOME_R - arm * Math.cos(rad), y: DOME_Y - arm * Math.sin(rad) };
+    const jackTop = { x: DOME_L + arm * Math.cos(rad), y: DOME_Y - arm * Math.sin(rad) };
     const domeW = DOME_R - DOME_L;
+    // Escalier : du milieu du niveau 3 (bas de la vue) au niveau 4, de gauche à droite
+    const steps = [];
+    let sx = 34, sy = 260;
+    for (let i = 0; i < 8; i++) { steps.push(`${sx},${sy}`); sy -= 10; steps.push(`${sx},${sy}`); sx += 22; }
+    steps.push(`${sx},${sy}`);
+    const stairEndX = sx;
 
     const pipeline = trace
       .map((t) => {
@@ -199,80 +208,98 @@ class VentilationDesenfumageCard extends HTMLElement {
           </div>
         </div>
 
-        <svg class="scene" viewBox="0 0 400 240" role="img" aria-label="${esc(doorText)}">
+        <svg class="scene" viewBox="0 0 400 260" role="img" aria-label="${esc(doorText)}">
           <defs>
             <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stop-color="${night ? "#1b2440" : "#9fd3f5"}"/>
               <stop offset="1" stop-color="${night ? "#2e3b63" : "#dff1fc"}"/>
             </linearGradient>
-            <clipPath id="inside"><rect x="56" y="146" width="288" height="94"/></clipPath>
           </defs>
 
-          <rect x="0" y="0" width="400" height="240" fill="url(#sky)" opacity="0.55"/>
+          <rect x="0" y="0" width="400" height="${ROOF_Y}" fill="url(#sky)" opacity="0.55"/>
           ${night
-            ? `<circle cx="352" cy="34" r="13" fill="#f4f1d0"/><circle cx="358" cy="29" r="12" fill="#2a3659" opacity="0.9"/>`
-            : `<circle cx="352" cy="34" r="14" fill="#ffc94a"/>`}
+            ? `<circle cx="24" cy="22" r="11" fill="#f4f1d0"/><circle cx="29" cy="18" r="10" fill="#2a3659" opacity="0.9"/>`
+            : `<circle cx="24" cy="22" r="12" fill="#ffc94a"/>`}
 
           ${windy ? `<g class="wind">
-              <path d="M84 22 Q130 12 176 22" /><path d="M96 44 Q140 34 184 44" /><path d="M0 84 Q36 76 72 84" />
+              <path d="M60 84 Q90 76 120 84" /><path d="M150 16 Q196 6 242 16" /><path d="M200 70 Q240 62 270 70" />
             </g>` : ""}
 
-          ${raining ? `<g class="rain">${[20, 60, 100, 140, 300, 340, 380, 170, 240].map((x, i) =>
+          ${raining ? `<g class="rain">${[20, 70, 100, 140, 210, 250, 300, 340, 380].map((x, i) =>
             `<line x1="${x}" y1="${-10 - (i % 3) * 25}" x2="${x - 6}" y2="${4 - (i % 3) * 25}" style="animation-delay:${(i * 0.17).toFixed(2)}s"/>`).join("")}</g>` : ""}
 
-          <!-- intérieur (dernier étage) -->
-          <rect x="50" y="146" width="300" height="94" class="inside"/>
-          <g clip-path="url(#inside)">
-            <polyline class="stairs" points="66,240 66,218 100,218 100,194 134,194 134,170 ${DOME_L + 4},170 ${DOME_L + 4},150"/>
-          </g>
+          <!-- intérieur : niveau 4 et moitié du niveau 3 -->
+          <rect x="22" y="${ROOF_Y}" width="356" height="${260 - ROOF_Y}" class="inside"/>
+          <text x="32" y="${ROOF_Y + 24}" class="cap">Niveau 4</text>
+          <text x="${stairEndX + 20}" y="${FLOOR4_Y + 26}" class="cap">Niveau 3</text>
 
-          <!-- dalle (trémie sous la coupole), acrotères et murs -->
-          <polyline class="roof" points="40,${ROOF_Y + 5} ${DOME_L},${ROOF_Y + 5}"/>
-          <polyline class="roof" points="${DOME_R},${ROOF_Y + 5} 360,${ROOF_Y + 5}"/>
-          <polyline class="wall" points="44,${ROOF_Y - 12} 44,240"/>
-          <polyline class="wall" points="356,${ROOF_Y - 12} 356,240"/>
+          <!-- escalier (monte de gauche à droite jusqu'au niveau 4) -->
+          <polyline class="stairs" points="${steps.join(" ")}"/>
+
+          <!-- dalles : niveau 4 (trémie de l'escalier) et toit (trémie de la coupole) -->
+          <polyline class="slab" points="${stairEndX},${FLOOR4_Y + 5} 378,${FLOOR4_Y + 5}"/>
+          <polyline class="roof" points="16,${ROOF_Y + 5} ${DOME_L},${ROOF_Y + 5}"/>
+          <polyline class="roof" points="${DOME_R},${ROOF_Y + 5} 384,${ROOF_Y + 5}"/>
+          <!-- façades et acrotères -->
+          <polyline class="wall" points="20,${ROOF_Y - 12} 20,260"/>
+          <polyline class="wall" points="380,${ROOF_Y - 12} 380,260"/>
           <!-- costière -->
           <polyline class="curb" points="${DOME_L + 3},${ROOF_Y + 9} ${DOME_L + 3},${DOME_Y}"/>
           <polyline class="curb" points="${DOME_R - 3},${ROOF_Y + 9} ${DOME_R - 3},${DOME_Y}"/>
 
-          <!-- vérin -->
-          <line class="jack" x1="${DOME_L + 10}" y1="${ROOF_Y + 2}" x2="${jackTop.x.toFixed(1)}" y2="${jackTop.y.toFixed(1)}"/>
+          <!-- panneaux solaires -->
+          <g class="pv">
+            ${[206, 248, 290].map((x) => `
+              <line class="leg" x1="${x + 34}" y1="${ROOF_Y}" x2="${x + 34}" y2="${ROOF_Y - 15}"/>
+              <line class="leg" x1="${x + 6}" y1="${ROOF_Y}" x2="${x + 6}" y2="${ROOF_Y - 4}"/>
+              <line class="panel" x1="${x}" y1="${ROOF_Y - 4}" x2="${x + 40}" y2="${ROOF_Y - 18}"/>`).join("")}
+          </g>
 
-          <!-- coupole -->
-          <g class="dome ${isOpen ? "open" : ""} ${doorKnown ? "" : "unknown"}" transform="rotate(${angle} ${DOME_R} ${DOME_Y})">
+          <!-- mât et station Ecowitt WS90 -->
+          <g class="ws90" data-mi="outdoor_temp">
+            <line class="mast" x1="358" y1="${ROOF_Y}" x2="358" y2="38"/>
+            <rect x="348" y="28" width="20" height="12" rx="3" class="head"/>
+            <path d="M346 28 Q358 16 370 28 Z" class="head"/>
+          </g>
+
+          <!-- vérin -->
+          <line class="jack" x1="${DOME_R - 10}" y1="${ROOF_Y + 2}" x2="${jackTop.x.toFixed(1)}" y2="${jackTop.y.toFixed(1)}"/>
+
+          <!-- coupole (charnière à gauche) -->
+          <g class="dome ${isOpen ? "open" : ""} ${doorKnown ? "" : "unknown"}" transform="rotate(${-angle} ${DOME_L} ${DOME_Y})">
             <path d="M${DOME_L} ${DOME_Y} A${domeW / 2} ${DOME_H} 0 0 1 ${DOME_R} ${DOME_Y} Z"/>
             <line x1="${DOME_L - 2}" y1="${DOME_Y}" x2="${DOME_R + 2}" y2="${DOME_Y}" class="rim"/>
             <path d="M${DOME_L + 16} ${DOME_Y - 8} Q${DOME_L + 24} ${DOME_Y - DOME_H + 4} ${DOME_L + 40} ${DOME_Y - DOME_H + 2}" class="shine"/>
           </g>
-          <circle cx="${DOME_R}" cy="${DOME_Y}" r="3.5" class="hinge"/>
+          <circle cx="${DOME_L}" cy="${DOME_Y}" r="3.5" class="hinge"/>
 
           ${isOpen ? `<g class="air">
-              <path d="M196 214 C196 170 196 140 170 40"/>
-              <path d="M218 220 C218 176 214 146 196 54"/>
-              <path d="M176 206 C176 170 172 140 146 66"/>
+              <path d="M150 250 C150 190 150 130 170 98 S206 56 232 40"/>
+              <path d="M176 246 C176 190 176 136 186 108 S216 74 244 62"/>
+              <path d="M124 240 C126 190 132 132 154 100 S188 54 214 26"/>
             </g>` : ""}
 
           <!-- étiquettes -->
           <g class="lbl" data-mi="outdoor_temp">
-            <rect x="8" y="8" width="64" height="${hOut !== null ? 52 : 38}" rx="6"/>
-            <text x="40" y="21" text-anchor="middle" class="cap">Extérieur</text>
-            <text x="40" y="38" text-anchor="middle" class="big">${fmt(tOut, "°")}</text>
-            ${hOut !== null ? `<text x="40" y="53" text-anchor="middle" class="small">${fmt(hOut, " %", 0)}</text>` : ""}
+            <rect x="276" y="8" width="64" height="${hOut !== null ? 52 : 38}" rx="6"/>
+            <text x="308" y="21" text-anchor="middle" class="cap">Extérieur</text>
+            <text x="308" y="38" text-anchor="middle" class="big">${fmt(tOut, "°")}</text>
+            ${hOut !== null ? `<text x="308" y="53" text-anchor="middle" class="small">${fmt(hOut, " %", 0)}</text>` : ""}
           </g>
 
           <g class="lbl" data-mi="indoor_temp">
-            <rect x="262" y="164" width="80" height="${hIn !== null ? 52 : 38}" rx="6"/>
-            <text x="302" y="177" text-anchor="middle" class="cap">Cage d'escalier</text>
-            <text x="302" y="194" text-anchor="middle" class="big">${fmt(tIn, "°")}</text>
-            ${hIn !== null ? `<text x="302" y="209" text-anchor="middle" class="small">${fmt(hIn, " %", 0)}</text>` : ""}
+            <rect x="288" y="122" width="80" height="${hIn !== null ? 52 : 38}" rx="6"/>
+            <text x="328" y="135" text-anchor="middle" class="cap">Cage d'escalier</text>
+            <text x="328" y="152" text-anchor="middle" class="big">${fmt(tIn, "°")}</text>
+            ${hIn !== null ? `<text x="328" y="167" text-anchor="middle" class="small">${fmt(hIn, " %", 0)}</text>` : ""}
           </g>
 
           <g class="lbl door" data-mi="door">
-            <rect x="262" y="88" width="88" height="22" rx="11"/>
-            <text x="306" y="103" text-anchor="middle" class="small b">${esc(doorText)}</text>
+            <rect x="14" y="44" width="88" height="22" rx="11"/>
+            <text x="58" y="59" text-anchor="middle" class="small b">${esc(doorText)}</text>
           </g>
 
-          ${!isArmed ? `<g class="stamp"><rect x="110" y="6" width="180" height="26" rx="13"/><text x="200" y="24" text-anchor="middle">SYSTÈME DÉSARMÉ</text></g>` : ""}
+          ${!isArmed ? `<g class="stamp"><rect x="230" y="222" width="140" height="26" rx="13"/><text x="300" y="240" text-anchor="middle">SYSTÈME DÉSARMÉ</text></g>` : ""}
         </svg>
 
         <div class="chips">
@@ -319,6 +346,11 @@ const STYLE = `
   .roof { fill:none; stroke: var(--primary-text-color,#212121); stroke-width:10; stroke-linecap:butt; opacity:.8; }
   .wall { fill:none; stroke: var(--primary-text-color,#212121); stroke-width:10; opacity:.8; }
   .stairs { fill:none; stroke: var(--secondary-text-color,#727272); stroke-width:6; stroke-linejoin:round; opacity:.6; }
+  .slab { fill:none; stroke: var(--primary-text-color,#212121); stroke-width:10; opacity:.55; }
+  .pv .panel { stroke:#1f4e8c; stroke-width:6; stroke-linecap:round; }
+  .pv .leg, .ws90 .mast { stroke: var(--secondary-text-color,#727272); stroke-width:3; }
+  .ws90 { cursor:pointer; }
+  .ws90 .head { fill: var(--card-background-color,#fff); stroke: var(--secondary-text-color,#727272); stroke-width:2; }
   .curb { fill:none; stroke: var(--primary-text-color,#212121); stroke-width:6; opacity:.8; }
   .dome path:first-child { fill: rgba(160,205,235,.45); stroke: var(--secondary-text-color,#727272); stroke-width:3; }
   .dome .rim { stroke: var(--secondary-text-color,#727272); stroke-width:6; stroke-linecap:round; }
