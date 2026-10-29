@@ -21,40 +21,14 @@ views:
     max_columns: 3
     sections:
       # ------------------------------------------------------------------
-      # Vue d'ensemble
+      # Vue d'ensemble : carte graphique (fournie par l'intégration)
       # ------------------------------------------------------------------
       - type: grid
+        column_span: 2
         cards:
-          - type: heading
-            heading: Ouvrant cage d'escalier
-            heading_style: title
-            icon: mdi:stairs
-          - type: markdown
-            text_only: true
-            content: >-
-              {% set door = 'binary_sensor.ouvrant_cage_escalier' %}{# À ADAPTER #}
-              {% set tilt = 'sensor.ouvrant_cage_escalier_angle' %}{# À ADAPTER (optionnel) #}
-              {% set d = 'sensor.ventilation_desenfumage_decision' %}
-              {% set ouvert = is_state(door, 'on') %}
-              {% set inconnu = states(door) in ['unavailable', 'unknown'] %}
-              <ha-alert alert-type="{{ 'info' if inconnu else ('warning' if ouvert else 'success') }}">
-              <ha-icon icon="{{ 'mdi:help-box' if inconnu else ('mdi:window-open-variant' if ouvert else 'mdi:window-closed-variant') }}"></ha-icon>
-              <b>{{ 'État inconnu' if inconnu else ('OUVERT' if ouvert else 'FERMÉ') }}</b>
-              {% if has_value(tilt) and ouvert %} – angle {{ states(tilt) }}°{% endif %}
-              </ha-alert>
-
-              **Décision : {{ states(d) }}** (priorité {{ state_attr(d, 'priorite') }})
-              {{ state_attr(d, 'raison') }}
-
-              {% if not is_state('switch.ventilation_desenfumage_systeme_arme', 'on') %}
-              <ha-alert alert-type="error">Système désarmé : {{ state_attr('switch.ventilation_desenfumage_systeme_arme', 'raison_desarmement') }}</ha-alert>
-              {% endif %}
-          - type: tile
-            entity: sensor.ventilation_desenfumage_mode_saisonnier
-            name: Mode
-          - type: tile
-            entity: sensor.ventilation_desenfumage_temperature_exterieure_moyenne_24_h
-            name: Moyenne ext. 24 h
+          - type: custom:ventilation-desenfumage-card
+            entity: sensor.ventilation_desenfumage_decision
+            title: Ouvrant cage d'escalier
 
       # ------------------------------------------------------------------
       # Commandes

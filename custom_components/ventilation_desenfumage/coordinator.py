@@ -20,6 +20,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import Context, Event, EventStateChangedData, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.sun import get_astral_event_date, get_astral_event_next
@@ -133,6 +134,7 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
         self._close_retries = 0
         self._started_at = dt_util.utcnow()
         self._shellys_online_since: datetime | None = None
+        self._entity_map: dict[str, str | None] | None = None
 
     # ------------------------------------------------------------------
     # Cycle de vie
@@ -682,6 +684,31 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
     # ------------------------------------------------------------------
     # Accesseurs pour les entités
     # ------------------------------------------------------------------
+
+    def entity_map(self) -> dict[str, str | None]:
+        """Entités utilisées par la carte graphique (sources + entités de l'intégration)."""
+        if self._entity_map is None:
+            reg = er.async_get(self.hass)
+            uid = self.config_entry.entry_id
+
+            def own(domain: str, key: str) -> str | None:
+                return reg.async_get_entity_id(domain, DOMAIN, f"{uid}_{key}")
+
+            mapping = {k: self.conf.get(k) for k in ENTITY_KEYS}
+            mapping.update(
+                armed_switch=own("switch", "systeme_arme"),
+                ventilation_switch=own("switch", "ventilation"),
+                open_button=own("button", "ouvrir"),
+                close_button=own("button", "fermer"),
+                resume_button=own("button", "retour_auto"),
+                override_end=own("sensor", "fin_commande_manuelle"),
+                season=own("sensor", "mode_saison"),
+                average=own("sensor", "temperature_moyenne_24h"),
+            )
+            if all(mapping[k] for k in ("armed_switch", "open_button", "close_button")):
+                self._entity_map = mapping  # mise en cache une fois tout enregistré
+            return mapping
+        return self._entity_map
 
     @property
     def door_tilt(self) -> float | None:

@@ -287,3 +287,16 @@ async def test_movement_counters(hass, freezer, monkeypatch, hass_admin_user, ha
                                    context=Context(user_id=hass_admin_user.id))
     await hass.async_block_till_done()
     assert hass.states.get(f"{p}_ouvertures").state == "0"
+
+
+async def test_card_entity_map(hass, freezer, monkeypatch):
+    entry, on, off = await _setup(hass, freezer, monkeypatch, _local(hass, 9, 0))
+    hass.states.async_set("sensor.ws90_temp", "12.5")  # nouvelle évaluation après l'enregistrement des entités
+    await hass.async_block_till_done()
+    ent = _decision(hass).attributes["entites"]
+    assert ent["door"] == "binary_sensor.ouvrant"
+    assert ent["armed_switch"] == f"switch.{PREFIX}_systeme_arme"
+    assert ent["open_button"] == f"button.{PREFIX}_ouvrir"
+    assert ent["close_button"] == f"button.{PREFIX}_fermer"
+    assert ent["resume_button"] == f"button.{PREFIX}_retour_en_automatique"
+    assert ent["season"] == f"sensor.{PREFIX}_mode_saisonnier"

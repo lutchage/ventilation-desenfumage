@@ -121,6 +121,30 @@ Le fichier `dashboard/ventilation_dashboard.yaml` contient un tableau de bord pr
 l'emploi (vue « Ouvrant » + vue « Réglages »). Remplacer les lignes marquées
 `# À ADAPTER` par vos entités et les identifiants des utilisateurs autorisés.
 
+## Carte graphique
+
+L'intégration fournit sa propre carte, chargée automatiquement dans Home Assistant
+(aucune ressource à ajouter) :
+
+```yaml
+type: custom:ventilation-desenfumage-card
+entity: sensor.ventilation_desenfumage_decision
+title: Ouvrant cage d'escalier   # optionnel
+show_pipeline: true              # optionnel : barre des 10 niveaux
+show_buttons: true               # optionnel : boutons Ouvrir / Fermer / Auto
+```
+
+![Carte graphique](images/carte.png)
+
+Elle affiche une coupe du toit avec l'ouvrant à son angle réel (capteur d'inclinaison),
+le flux d'air quand l'ouvrant est ouvert, la pluie et le vent, le jour ou la nuit, les
+températures et humidités intérieures et extérieures, le mode saisonnier, l'état armé,
+la commande manuelle en cours, le niveau gagnant du pipeline et les boutons de commande.
+Un clic sur un élément ouvre la fiche de l'entité. En cas d'alarme, le cadre clignote en rouge.
+
+Les autres entités sont trouvées automatiquement grâce à l'attribut `entites` du
+capteur de décision.
+
 ## Événements
 
 Chaque événement important déclenche l'événement Home Assistant
