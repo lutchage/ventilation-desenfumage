@@ -57,7 +57,7 @@
       "init": {
         "title": "Options techniques",
         "data": {
-          "allowed_users": "Utilisateurs autorisés à armer / désarmer (vide = administrateurs)",
+          "allowed_users": "Utilisateurs autorisés à armer / désarmer et à remettre les compteurs à zéro (vide = administrateurs)",
           "pulse_s": "Durée de l'impulsion",
           "keepalive_min": "Intervalle de maintien OUVRIR",
           "central_timer_min": "Temporisation de la centrale (S2.3)",

@@ -60,6 +60,18 @@ Un changement d'état du capteur d'ouverture est classé :
 Les changements sont ignorés pendant le délai de resynchronisation qui suit le démarrage
 de Home Assistant ou le retour des Shelly (fin de maintenance ou de coupure).
 
+## Cycle de vie du moteur
+
+| Capteur | Ce qui est compté |
+|---|---|
+| Nombre d'ouvertures / de fermetures | Mouvements **réels** vus par le capteur d'ouverture, quelle que soit leur origine (Home Assistant, bouton de maintenance, alarme). Un mouvement fait pendant que le capteur était indisponible est compté à son retour. |
+| Impulsions OUVRIR / FERMER envoyées | Ordres envoyés par Home Assistant (y compris les impulsions de maintien). |
+
+Les compteurs sont conservés après un redémarrage. Le bouton « Remise à zéro des
+compteurs » (après un remplacement du moteur) est réservé aux utilisateurs autorisés ;
+la date de départ est indiquée dans l'attribut `depuis`. Le dashboard affiche aussi un
+graphique des ouvertures par mois.
+
 ## Installation
 
 ### Via HACS (dépôt personnalisé)

@@ -185,6 +185,51 @@ views:
                 name: Shelly FERMER
 
       # ------------------------------------------------------------------
+      # Cycle de vie du moteur
+      # ------------------------------------------------------------------
+      - type: grid
+        cards:
+          - type: heading
+            heading: Cycle de vie du moteur
+            icon: mdi:engine
+          - type: tile
+            entity: sensor.ventilation_desenfumage_nombre_d_ouvertures
+            name: Ouvertures
+          - type: tile
+            entity: sensor.ventilation_desenfumage_nombre_de_fermetures
+            name: Fermetures
+          - type: tile
+            entity: sensor.ventilation_desenfumage_impulsions_ouvrir_envoyees
+            name: Impulsions OUVRIR
+          - type: tile
+            entity: sensor.ventilation_desenfumage_impulsions_fermer_envoyees
+            name: Impulsions FERMER
+          - type: statistics-graph
+            title: Ouvertures par mois
+            entities:
+              - sensor.ventilation_desenfumage_nombre_d_ouvertures
+            stat_types:
+              - change
+            period: month
+            chart_type: bar
+            days_to_show: 365
+          - type: tile
+            entity: button.ventilation_desenfumage_remise_a_zero_des_compteurs
+            name: Remise à zéro (moteur remplacé)
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.ventilation_desenfumage_remise_a_zero_des_compteurs
+              confirmation:
+                text: Remettre tous les compteurs à zéro ? À faire seulement après un remplacement du moteur.
+            visibility:
+              - condition: user
+                users:
+                  - ID_UTILISATEUR_1 # À ADAPTER
+                  - ID_UTILISATEUR_2 # À ADAPTER
+
+      # ------------------------------------------------------------------
       # Trace de décision et journal
       # ------------------------------------------------------------------
       - type: grid

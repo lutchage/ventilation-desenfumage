@@ -27,6 +27,10 @@ async def async_setup_entry(
             AverageSensor(c),
             OverrideEndSensor(c),
             LastEventSensor(c),
+            CounterSensor(c, "nombre_ouvertures", "Nombre d'ouvertures", "ouvertures", "mdi:window-open-variant"),
+            CounterSensor(c, "nombre_fermetures", "Nombre de fermetures", "fermetures", "mdi:window-closed-variant"),
+            CounterSensor(c, "impulsions_ouvrir", "Impulsions OUVRIR envoyées", "impulsions_ouvrir", "mdi:gesture-tap"),
+            CounterSensor(c, "impulsions_fermer", "Impulsions FERMER envoyées", "impulsions_fermer", "mdi:gesture-tap"),
         ]
     )
 
@@ -146,3 +150,23 @@ class LastEventSensor(VentilationEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {"journal": list(self.coordinator.events)}
+
+
+class CounterSensor(VentilationEntity, SensorEntity):
+    """Compteur de cycle de vie (ne diminue qu'en cas de remise à zéro)."""
+
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = "cycles"
+
+    def __init__(self, coordinator, key: str, name: str, counter: str, icon: str) -> None:
+        super().__init__(coordinator, key, name)
+        self._counter = counter
+        self._attr_icon = icon
+
+    @property
+    def native_value(self) -> int:
+        return int(self.coordinator.counters.get(self._counter, 0))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"depuis": self.coordinator.counters.get("depuis")}

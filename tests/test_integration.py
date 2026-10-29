@@ -254,3 +254,36 @@ async def test_config_flow(hass):
     )
     assert result["type"] == "create_entry"
     assert result["data"]["shelly_open"] == "switch.shelly_a"
+
+
+async def test_movement_counters(hass, freezer, monkeypatch, hass_admin_user, hass_read_only_user):
+    entry, on, off = await _setup(hass, freezer, monkeypatch, _local(hass, 9, 0))
+    p = f"sensor.{PREFIX}_nombre_d"
+    assert hass.states.get(f"{p}_ouvertures").state == "0"
+    # un cycle complet
+    hass.states.async_set("binary_sensor.ouvrant", "on")
+    await hass.async_block_till_done()
+    hass.states.async_set("binary_sensor.ouvrant", "off")
+    await hass.async_block_till_done()
+    # mouvement pendant une indisponibilité (maintenance) : compté au retour
+    hass.states.async_set("binary_sensor.ouvrant", "unavailable")
+    await hass.async_block_till_done()
+    hass.states.async_set("binary_sensor.ouvrant", "on")
+    await hass.async_block_till_done()
+    # retour au même état après indisponibilité : pas compté
+    hass.states.async_set("binary_sensor.ouvrant", "unavailable")
+    await hass.async_block_till_done()
+    hass.states.async_set("binary_sensor.ouvrant", "on")
+    await hass.async_block_till_done()
+    assert hass.states.get(f"{p}_ouvertures").state == "2"
+    assert hass.states.get(f"sensor.{PREFIX}_nombre_de_fermetures").state == "1"
+    assert int(hass.states.get(f"sensor.{PREFIX}_impulsions_fermer_envoyees").state) >= 1
+
+    reset = {"entity_id": f"button.{PREFIX}_remise_a_zero_des_compteurs"}
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call("button", "press", reset, blocking=True,
+                                       context=Context(user_id=hass_read_only_user.id))
+    await hass.services.async_call("button", "press", reset, blocking=True,
+                                   context=Context(user_id=hass_admin_user.id))
+    await hass.async_block_till_done()
+    assert hass.states.get(f"{p}_ouvertures").state == "0"

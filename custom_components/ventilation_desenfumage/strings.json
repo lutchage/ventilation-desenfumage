@@ -57,7 +57,7 @@
       "init": {
         "title": "Technical options",
         "data": {
-          "allowed_users": "Users allowed to arm / disarm (empty = admins)",
+          "allowed_users": "Users allowed to arm / disarm and reset counters (empty = admins)",
           "pulse_s": "Pulse duration",
           "keepalive_min": "OPEN keep-alive interval",
           "central_timer_min": "Panel ventilation timer (S2.3)",

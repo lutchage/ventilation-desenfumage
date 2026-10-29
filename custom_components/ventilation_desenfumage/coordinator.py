@@ -117,6 +117,8 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
         self.last_open_pulse: datetime | None = None
         self.last_close_pulse: datetime | None = None
         self.events: deque[dict] = deque(maxlen=20)
+        self.counters: dict[str, Any] = _new_counters()
+        self._last_door: str | None = None  # dernier état valide connu (on / off)
 
         # État volatil
         self.inputs: Inputs | None = None
@@ -153,6 +155,11 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
         self.last_open_pulse = dt_util.parse_datetime(stored.get("last_open_pulse") or "")
         self.last_close_pulse = dt_util.parse_datetime(stored.get("last_close_pulse") or "")
         self.events.extend(stored.get("events", []))
+        self.counters = {**_new_counters(), **(stored.get("counters") or {})}
+        self._last_door = stored.get("last_door")
+        door = self._st(CONF_DOOR)
+        if self._last_door is None and door is not None and door.state in (STATE_ON, STATE_OFF):
+            self._last_door = door.state
 
         watched = [self.conf[k] for k in ENTITY_KEYS if self.conf.get(k)]
         self._unsubs.append(async_track_state_change_event(self.hass, watched, self._on_state_change))
@@ -178,6 +185,8 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
             "last_open_pulse": self.last_open_pulse.isoformat() if self.last_open_pulse else None,
             "last_close_pulse": self.last_close_pulse.isoformat() if self.last_close_pulse else None,
             "events": list(self.events),
+            "counters": self.counters,
+            "last_door": self._last_door,
         }
 
     @callback
@@ -233,6 +242,7 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
         now = dt_util.utcnow()
         self._update_online(now)
         if event.data["entity_id"] == self.conf.get(CONF_DOOR):
+            self._count_movement(event.data["new_state"])
             self._handle_door(event.data["old_state"], event.data["new_state"], now)
         self.hass.async_create_task(self.async_refresh())
 
@@ -535,8 +545,10 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
 
         if target == TARGET_OPEN:
             self.last_open_pulse = now
+            self.counters["impulsions_ouvrir"] += 1
         else:
             self.last_close_pulse = now
+            self.counters["impulsions_fermer"] += 1
         self._save()
         _LOGGER.debug("Impulsion %s envoyée", target)
 
@@ -562,7 +574,7 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
         allowed: list[str] = self.opts.get(OPT_ALLOWED_USERS) or []
         ok = user.id in allowed if allowed else user.is_admin
         if not ok:
-            raise HomeAssistantError(f"{user.name} n'est pas autorisé à armer ou désarmer le système")
+            raise HomeAssistantError(f"{user.name} n'est pas autorisé à effectuer cette action")
         return user.name
 
     async def _user_name(self, context: Context | None) -> str | None:
@@ -613,6 +625,30 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
         self._save()
         await self.async_refresh()
 
+    @callback
+    def _count_movement(self, new: State | None) -> None:
+        """Compter les mouvements réels de l'ouvrant (cycle de vie du moteur).
+
+        Compare au dernier état valide connu : un mouvement fait pendant que le
+        capteur était indisponible (maintenance, coupure) est compté à son retour.
+        Tous les mouvements sont comptés, quelle que soit leur origine.
+        """
+        if new is None or new.state not in (STATE_ON, STATE_OFF):
+            return
+        if self._last_door is not None and new.state != self._last_door:
+            key = "ouvertures" if new.state == STATE_ON else "fermetures"
+            self.counters[key] += 1
+        self._last_door = new.state
+        self._save()
+
+    async def async_reset_counters(self, context: Context | None) -> None:
+        """Remettre les compteurs à zéro (utilisateurs autorisés, ex. moteur remplacé)."""
+        name = await self._check_permission(context)
+        self.counters = _new_counters()
+        self._log_event("compteurs", f"Compteurs remis à zéro{f' par {name}' if name else ''}", notify=False)
+        self._save()
+        self.async_update_listeners()
+
     async def async_resume_auto(self) -> None:
         """Annuler la commande manuelle."""
         if self.override:
@@ -650,3 +686,13 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
     @property
     def door_tilt(self) -> float | None:
         return self._float(CONF_DOOR_TILT)
+
+
+def _new_counters() -> dict[str, Any]:
+    return {
+        "ouvertures": 0,
+        "fermetures": 0,
+        "impulsions_ouvrir": 0,
+        "impulsions_fermer": 0,
+        "depuis": dt_util.now().isoformat(),
+    }

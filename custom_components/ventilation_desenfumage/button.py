@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from homeassistant.components.button import ButtonEntity
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -20,6 +21,7 @@ async def async_setup_entry(
             ManualButton(c, "ouvrir", "Ouvrir", TARGET_OPEN, "mdi:window-open-variant"),
             ManualButton(c, "fermer", "Fermer", TARGET_CLOSE, "mdi:window-closed-variant"),
             ResumeButton(c),
+            ResetCountersButton(c),
         ]
     )
 
@@ -46,3 +48,16 @@ class ResumeButton(VentilationEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         await self.coordinator.async_resume_auto()
+
+
+class ResetCountersButton(VentilationEntity, ButtonEntity):
+    """Remise à zéro des compteurs (utilisateurs autorisés)."""
+
+    _attr_icon = "mdi:counter"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "remise_a_zero_compteurs", "Remise à zéro des compteurs")
+
+    async def async_press(self) -> None:
+        await self.coordinator.async_reset_counters(self._context)
