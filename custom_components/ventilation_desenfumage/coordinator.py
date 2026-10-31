@@ -57,6 +57,8 @@ from .const import (
     OPT_NOTIFY_EVENTS,
     OPT_NOTIFY_TARGETS,
     OPT_NOTIFY_URL,
+    OPT_OFFLINE_DEBOUNCE_MIN,
+    OPT_STARTUP_MIN,
     CLOSE_ACTION_EVENTS,
     CLOSE_ACTION_PREFIX,
     OPT_NOTIFY,
@@ -144,6 +146,8 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
         self._started_at = dt_util.utcnow()
         self._shellys_online_since: datetime | None = None
         self._entity_map: dict[str, str | None] | None = None
+        self._one_offline_since: datetime | None = None
+        self._station_bad_since: datetime | None = None
         # Détection du mouvement de l'ouvrant
         self._angle_changed_at: datetime | None = None
         self._expected_move: tuple[str, datetime] | None = None  # (cible, instant de l'impulsion)
@@ -277,7 +281,7 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
 
         if not self.settings.armed:
             return
-        if now - self._started_at < grace:
+        if now - self._started_at < max(grace, timedelta(minutes=self.opts[OPT_STARTUP_MIN])):
             return
         if self._shellys_online_since is None or now - self._shellys_online_since < grace:
             return  # retour de maintenance ou de coupure
@@ -454,14 +458,45 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
 
         station_ok, station_issue = self._weather_station(now)
         weather_bad, weather_reason = self._weather(now)
+        debounce = timedelta(minutes=self.opts[OPT_OFFLINE_DEBOUNCE_MIN])
 
+        # Station météo : panne retenue seulement si elle dure (anti-rebond)
+        if station_ok:
+            self._station_bad_since = None
+        else:
+            self._station_bad_since = self._station_bad_since or now
+            if now - self._station_bad_since < debounce:
+                station_ok = True
+
+        # Un seul Shelly hors ligne : défaut retenu seulement s'il dure (anti-rebond)
         self._update_online(now)
+        open_online = self._online(CONF_SHELLY_OPEN)
+        close_online = self._online(CONF_SHELLY_CLOSE)
+        if open_online != close_online:
+            self._one_offline_since = self._one_offline_since or now
+            if now - self._one_offline_since < debounce:
+                open_online = close_online = True
+        else:
+            self._one_offline_since = None
+
+        # Phase de démarrage de Home Assistant
+        startup_end = self._started_at + timedelta(minutes=self.opts[OPT_STARTUP_MIN])
+        starting = now < startup_end
+        if starting:
+            self._schedule_refresh_at(startup_end)
+
         return Inputs(
             now=now,
+            starting=starting,
+            starting_reason=(
+                f"Démarrage : attente des appareils jusqu'à {dt_util.as_local(startup_end):%H:%M}"
+                if starting
+                else ""
+            ),
             armed=self.settings.armed,
             disarm_reason=self.settings.disarm_reason,
-            shelly_open_online=self._online(CONF_SHELLY_OPEN),
-            shelly_close_online=self._online(CONF_SHELLY_CLOSE),
+            shelly_open_online=open_online,
+            shelly_close_online=close_online,
             ups_on_battery=ups_is_on_battery(self._ups_state(), self.opts[OPT_UPS_STATES]),
             alarm=alarm,
             fault=self._fault_value(now),
@@ -802,6 +837,20 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
     # ------------------------------------------------------------------
     # Mouvement de l'ouvrant
     # ------------------------------------------------------------------
+
+    @callback
+    def _schedule_refresh_at(self, when: datetime) -> None:
+        """Réévaluer juste après la fin de la phase de démarrage (une seule fois)."""
+        if getattr(self, "_startup_refresh_scheduled", False):
+            return
+        self._startup_refresh_scheduled = True
+        delay = max(0.0, (when - dt_util.utcnow()).total_seconds()) + 1
+
+        @callback
+        def _refresh(_now: datetime) -> None:
+            self.hass.async_create_task(self.async_refresh())
+
+        self._unsubs.append(async_call_later(self.hass, delay, _refresh))
 
     @callback
     def _schedule_listeners_update(self, delay: float) -> None:

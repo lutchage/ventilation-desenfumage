@@ -73,7 +73,9 @@
           "move_hold_s": "Délai sans variation d'angle avant de considérer l'ouvrant arrêté",
           "notify_targets": "Téléphones à notifier (services notify.mobile_app_…)",
           "notify_events": "Événements à notifier",
-          "notify_url": "Tableau de bord ouvert depuis la notification (ex. /lovelace/ventilation)"
+          "notify_url": "Tableau de bord ouvert depuis la notification (ex. /lovelace/ventilation)",
+          "startup_min": "Phase de démarrage (attente des appareils après un redémarrage)",
+          "offline_debounce_min": "Délai avant de signaler un Shelly ou la station météo hors ligne"
         }
       }
     }

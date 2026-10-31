@@ -23,6 +23,8 @@ class _Call:
         self.data = {"entity_id": entity_id}
 
 PREFIX = "ventilation_desenfumage"
+# Pas de phase de démarrage ni d'anti-rebond dans la plupart des tests
+NO_DELAY = {"startup_min": 0, "offline_debounce_min": 0}
 DATA = {
     "shelly_open": "switch.shelly_a",
     "shelly_close": "switch.shelly_b",
@@ -60,7 +62,7 @@ async def _setup(hass: HomeAssistant, freezer, monkeypatch, when: datetime, outd
         (calls_on if service == "turn_on" else calls_off).append(_Call(entity_id))
 
     monkeypatch.setattr(VentilationCoordinator, "_switch", _fake_switch)
-    entry = MockConfigEntry(domain=DOMAIN, title="Ventilation désenfumage", data=DATA)
+    entry = MockConfigEntry(domain=DOMAIN, title="Ventilation désenfumage", data=DATA, options=dict(NO_DELAY))
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -326,7 +328,7 @@ async def test_movement_detection_blocks_buttons(hass, freezer, monkeypatch):
         calls.append(f"{service}:{entity_id}")
 
     monkeypatch.setattr(VentilationCoordinator, "_switch", _fake_switch)
-    entry = MockConfigEntry(domain=DOMAIN, title="Ventilation désenfumage", data={**DATA, "door_tilt": "sensor.tilt"})
+    entry = MockConfigEntry(domain=DOMAIN, title="Ventilation désenfumage", data={**DATA, "door_tilt": "sensor.tilt"}, options=dict(NO_DELAY))
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -380,7 +382,7 @@ async def _setup_with_notify(hass, freezer, monkeypatch):
         domain=DOMAIN,
         title="Ventilation désenfumage",
         data=DATA,
-        options={"notify_targets": ["mobile_app_test"], "notify_url": "/lovelace/ventilation"},
+        options={**NO_DELAY, "notify_targets": ["mobile_app_test"], "notify_url": "/lovelace/ventilation"},
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -442,3 +444,87 @@ async def test_options_flow_notifications(hass, freezer, monkeypatch):
     assert "notify_targets" in fields and "notify_events" in fields and "notify_url" in fields
     sel = result["data_schema"].schema[fields["notify_targets"]]
     assert any(o["value"] == "mobile_app_pixel" for o in sel.config["options"])
+
+
+
+async def test_startup_phase_no_orders_no_notifications(hass, freezer, monkeypatch):
+    from pytest_homeassistant_custom_component.common import async_mock_service
+
+    freezer.move_to(_local(hass, 9, 0))
+    _set_base_states(hass)
+    hass.states.async_set("switch.shelly_b", "unavailable")  # le Shelly B démarre plus tard
+    pulses: list[str] = []
+
+    async def _fake_switch(self, service, entity_id):
+        if service == "turn_on":
+            pulses.append(entity_id)
+
+    monkeypatch.setattr(VentilationCoordinator, "_switch", _fake_switch)
+    sent = async_mock_service(hass, "notify", "mobile_app_test")
+    entry = MockConfigEntry(domain=DOMAIN, title="Ventilation désenfumage", data=DATA,
+                            options={"notify_targets": ["mobile_app_test"]})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert _decision(hass).state == "Au repos – fermé"
+    assert "Démarrage" in _decision(hass).attributes["raison"]
+    assert pulses == [] and sent == []
+    # le Shelly B revient pendant la phase de démarrage
+    await _tick(hass, freezer, timedelta(minutes=2))
+    hass.states.async_set("switch.shelly_b", "off")
+    await hass.async_block_till_done()
+    assert pulses == [] and sent == []
+    # fin de la phase : fonctionnement normal, sans fausse notification
+    await _tick(hass, freezer, timedelta(minutes=3, seconds=30))
+    assert "Démarrage" not in _decision(hass).attributes["raison"]
+    assert pulses == ["switch.shelly_b"]  # première décision : FERMER
+    assert sent == []
+
+
+async def test_startup_phase_still_reports_alarm(hass, freezer, monkeypatch):
+    freezer.move_to(_local(hass, 9, 0))
+    _set_base_states(hass)
+    hass.states.async_set("binary_sensor.shelly_a_input", "on")
+    monkeypatch.setattr(VentilationCoordinator, "_switch", lambda *a, **k: _noop())
+    entry = MockConfigEntry(domain=DOMAIN, title="Ventilation désenfumage", data=DATA)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert _decision(hass).state == "Alarme incendie"
+
+
+async def _noop():
+    return None
+
+
+async def test_offline_debounce(hass, freezer, monkeypatch):
+    freezer.move_to(_local(hass, 9, 0))
+    _set_base_states(hass)
+    monkeypatch.setattr(VentilationCoordinator, "_switch", lambda *a, **k: _noop())
+    entry = MockConfigEntry(domain=DOMAIN, title="Ventilation désenfumage", data=DATA,
+                            options={"startup_min": 0, "offline_debounce_min": 2})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    # micro-coupure du Shelly B : pas de défaut
+    hass.states.async_set("switch.shelly_b", "unavailable")
+    await hass.async_block_till_done()
+    assert _decision(hass).state == "Au repos – fermé"
+    await _tick(hass, freezer, timedelta(minutes=1))
+    hass.states.async_set("switch.shelly_b", "off")
+    await hass.async_block_till_done()
+    assert _decision(hass).state == "Au repos – fermé"
+    # coupure durable : défaut après 2 min
+    hass.states.async_set("switch.shelly_b", "unavailable")
+    await hass.async_block_till_done()
+    await _tick(hass, freezer, timedelta(minutes=2, seconds=30))
+    assert _decision(hass).state == "Défaut de l'installation"
+    # station météo : même anti-rebond
+    hass.states.async_set("switch.shelly_b", "off")
+    hass.states.async_set("sensor.ws90_gust", "unavailable")
+    await hass.async_block_till_done()
+    assert _decision(hass).state == "Au repos – fermé"
+    freezer.tick(timedelta(minutes=2, seconds=30))
+    async_fire_time_changed(hass, dt_util.utcnow())
+    await hass.async_block_till_done()
+    assert _decision(hass).state == "Station météo hors service"

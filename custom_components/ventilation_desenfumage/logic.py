@@ -307,6 +307,8 @@ class Inputs:
 
     override: Override | None = None
     ventilation: VentRequest = field(default_factory=lambda: VentRequest(False, ""))
+    starting: bool = False  # phase de démarrage : attente des appareils
+    starting_reason: str = ""
 
 
 @dataclass
@@ -358,6 +360,15 @@ def evaluate(inp: Inputs) -> Decision:
         (inp.disarm_reason or "Désarmé") if not inp.armed else "",
         None,
     )
+
+    # Phase de démarrage : aucun ordre tant que les appareils ne sont pas prêts
+    # (seules l'alarme et l'arrêt de sécurité restent évalués)
+    if inp.starting:
+        for level in ALL_LEVELS[2:-1]:
+            add(level, False, "", None)
+        add(LEVEL_DEFAULT, True, inp.starting_reason or "Démarrage : attente des appareils", None)
+        winner = next(t for t in trace if t.active)
+        return Decision(winner.priority, winner.key, winner.label, winner.reason, winner.target, trace)
 
     # 8 - Coupure secteur : Shelly hors ligne + onduleur sur batterie
     power_cut = shellys_offline and inp.ups_on_battery is True

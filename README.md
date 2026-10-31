@@ -31,6 +31,17 @@ Pour les automatisations, comparer l'attribut `cle` du capteur de décision plut
 | 2 | Ventilation automatique | Selon le mode saisonnier (voir ci-dessous) | Ouvrir + maintien |
 | 0 | Au repos – fermé | — | Fermer |
 
+### Démarrage et anti-rebond
+
+- **Phase de démarrage** : pendant les **5 premières minutes** après le démarrage de Home
+  Assistant (réglable), l'intégration attend que les appareils (Shelly, station météo) soient
+  prêts. Aucun ordre ni notification n'est envoyé ; la carte affiche « Au repos – fermé » avec
+  la raison « Démarrage : attente des appareils ». Seules l'alarme incendie et l'arrêt de
+  sécurité restent évalués. Les mouvements de l'ouvrant sont aussi ignorés pendant ce temps.
+- **Anti-rebond** : un **seul Shelly hors ligne** ou une **station météo hors service** ne sont
+  retenus qu'après **2 minutes** (réglable), pour éviter les fausses alertes lors d'une
+  micro-coupure Wi-Fi.
+
 ### Modes saisonniers (température extérieure moyenne sur 24 h)
 
 | Mode | Moyenne | Comportement |

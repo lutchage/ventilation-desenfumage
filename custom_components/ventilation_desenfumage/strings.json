@@ -73,7 +73,9 @@
           "move_hold_s": "Seconds without angle change before the window is considered stopped",
           "notify_targets": "Phones to notify (notify.mobile_app_… services)",
           "notify_events": "Events to notify",
-          "notify_url": "Dashboard opened from the notification (e.g. /lovelace/ventilation)"
+          "notify_url": "Dashboard opened from the notification (e.g. /lovelace/ventilation)",
+          "startup_min": "Startup phase (wait for devices after a restart)",
+          "offline_debounce_min": "Delay before reporting a Shelly or the weather station offline"
         }
       }
     }

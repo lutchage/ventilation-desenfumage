@@ -85,6 +85,8 @@ OPT_MOVE_HOLD_S = "move_hold_s"
 OPT_NOTIFY_TARGETS = "notify_targets"
 OPT_NOTIFY_EVENTS = "notify_events"
 OPT_NOTIFY_URL = "notify_url"
+OPT_STARTUP_MIN = "startup_min"
+OPT_OFFLINE_DEBOUNCE_MIN = "offline_debounce_min"
 
 # Événements pouvant être envoyés sur les téléphones (clé = type d'événement)
 NOTIFY_EVENT_TYPES = {
@@ -124,6 +126,8 @@ DEFAULT_OPTIONS = {
     OPT_NOTIFY_TARGETS: [],
     OPT_NOTIFY_EVENTS: DEFAULT_NOTIFY_EVENTS,
     OPT_NOTIFY_URL: "/lovelace",
+    OPT_STARTUP_MIN: 5,
+    OPT_OFFLINE_DEBOUNCE_MIN: 2,
 }
 
 UPDATE_INTERVAL_S = 30
