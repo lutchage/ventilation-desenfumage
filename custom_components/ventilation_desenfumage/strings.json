@@ -70,7 +70,10 @@
           "fault_invert": "Invert fault input",
           "ups_battery_states": "UPS on-battery states (comma separated)",
           "notify": "Persistent notifications",
-          "move_hold_s": "Seconds without angle change before the window is considered stopped"
+          "move_hold_s": "Seconds without angle change before the window is considered stopped",
+          "notify_targets": "Phones to notify (notify.mobile_app_… services)",
+          "notify_events": "Events to notify",
+          "notify_url": "Dashboard opened from the notification (e.g. /lovelace/ventilation)"
         }
       }
     }

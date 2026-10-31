@@ -82,6 +82,29 @@ OPT_UPS_STATES = "ups_battery_states"
 OPT_ALLOWED_USERS = "allowed_users"
 OPT_NOTIFY = "notify"
 OPT_MOVE_HOLD_S = "move_hold_s"
+OPT_NOTIFY_TARGETS = "notify_targets"
+OPT_NOTIFY_EVENTS = "notify_events"
+OPT_NOTIFY_URL = "notify_url"
+
+# Événements pouvant être envoyés sur les téléphones (clé = type d'événement)
+NOTIFY_EVENT_TYPES = {
+    "alarme": "Alarme incendie",
+    "desarme": "Arrêt de sécurité / système désarmé",
+    "arme": "Système réarmé",
+    "defaut": "Défaut de l'installation",
+    "coupure": "Coupure et retour du courant",
+    "fermeture": "L'ouvrant ne se ferme pas",
+    "temporisation": "Temporisation S2.3 trop courte",
+    "station": "Station météo hors service",
+    "manuel": "Commande manuelle",
+    "mode": "Changement de mode saisonnier",
+}
+DEFAULT_NOTIFY_EVENTS = [
+    "alarme", "desarme", "arme", "defaut", "coupure", "fermeture", "temporisation", "station",
+]
+# Événements dont la notification propose le bouton « Fermer »
+CLOSE_ACTION_EVENTS = {"fermeture", "temporisation", "station", "manuel"}
+CLOSE_ACTION_PREFIX = "VD_FERMER_"
 
 DEFAULT_OPTIONS = {
     OPT_PULSE_S: 1.0,
@@ -98,6 +121,9 @@ DEFAULT_OPTIONS = {
     OPT_ALLOWED_USERS: [],
     OPT_NOTIFY: True,
     OPT_MOVE_HOLD_S: 8,
+    OPT_NOTIFY_TARGETS: [],
+    OPT_NOTIFY_EVENTS: DEFAULT_NOTIFY_EVENTS,
+    OPT_NOTIFY_URL: "/lovelace",
 }
 
 UPDATE_INTERVAL_S = 30

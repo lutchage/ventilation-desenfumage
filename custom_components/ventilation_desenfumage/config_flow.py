@@ -38,6 +38,10 @@ from .const import (
     OPT_FAULT_INVERT,
     OPT_KEEPALIVE_MIN,
     OPT_MOVE_HOLD_S,
+    OPT_NOTIFY_EVENTS,
+    OPT_NOTIFY_TARGETS,
+    OPT_NOTIFY_URL,
+    NOTIFY_EVENT_TYPES,
     OPT_NOTIFY,
     OPT_PULSE_S,
     OPT_RESYNC_GRACE_S,
@@ -146,8 +150,23 @@ class VentilationOptionsFlow(OptionsFlow):
                                               mode=selector.NumberSelectorMode.BOX)
             )
 
+        notify_services = sorted(
+            name
+            for name in self.hass.services.async_services().get("notify", {})
+            if name not in ("send_message", "persistent_notification")
+        )
+        targets = [selector.SelectOptionDict(value=n, label=f"notify.{n}") for n in notify_services]
+        events = [selector.SelectOptionDict(value=k, label=v) for k, v in NOTIFY_EVENT_TYPES.items()]
+
         schema = vol.Schema(
             {
+                vol.Required(OPT_NOTIFY_TARGETS, default=cur[OPT_NOTIFY_TARGETS]): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=targets, multiple=True, custom_value=True)
+                ),
+                vol.Required(OPT_NOTIFY_EVENTS, default=cur[OPT_NOTIFY_EVENTS]): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=events, multiple=True)
+                ),
+                vol.Required(OPT_NOTIFY_URL, default=cur[OPT_NOTIFY_URL]): str,
                 vol.Required(OPT_ALLOWED_USERS, default=cur[OPT_ALLOWED_USERS]): selector.SelectSelector(
                     selector.SelectSelectorConfig(options=users, multiple=True)
                 ),

@@ -165,26 +165,41 @@ le temps de course). Pendant ce temps, Ouvrir et Fermer sont refusés. Le capteu
 Les autres entités sont trouvées automatiquement grâce à l'attribut `entites` du
 capteur de décision.
 
+## Notifications mobiles
+
+Dans **Configurer** (options de l'intégration) :
+
+| Option | Rôle |
+|---|---|
+| Téléphones à notifier | un ou plusieurs services `notify.mobile_app_…` (application Home Assistant) |
+| Événements à notifier | choix parmi la liste ci-dessous |
+| Tableau de bord | page ouverte en touchant la notification (ex. `/lovelace/ventilation`) |
+
+| Événement | Notifié par défaut | Bouton « Fermer » |
+|---|:--:|:--:|
+| Alarme incendie | ✅ | |
+| Arrêt de sécurité / système désarmé | ✅ | |
+| Système réarmé | ✅ | |
+| Défaut de l'installation | ✅ | |
+| Coupure et retour du courant | ✅ | |
+| L'ouvrant ne se ferme pas | ✅ | ✅ |
+| Temporisation S2.3 trop courte | ✅ | ✅ |
+| Station météo hors service | ✅ | ✅ |
+| Commande manuelle | | ✅ |
+| Changement de mode saisonnier | | |
+
+Chaque notification propose **« Ouvrir le tableau de bord »**. Le bouton **« Fermer »**
+envoie une commande manuelle FERMER, soumise aux mêmes règles que le bouton de la carte
+(refusée si le système est désarmé, à partir du niveau 4 ou pendant un mouvement ; dans ce
+cas une notification indique la raison). Il n'y a volontairement pas de bouton « Réarmer ».
+
 ## Événements
 
-Chaque événement important déclenche l'événement Home Assistant
-`ventilation_desenfumage_event` (`type`, `message`), utilisable pour envoyer une
-notification sur mobile :
+Chaque événement important déclenche aussi l'événement Home Assistant
+`ventilation_desenfumage_event` (`type`, `message`), utilisable dans vos automatisations.
 
-```yaml
-triggers:
-  - trigger: event
-    event_type: ventilation_desenfumage_event
-    event_data:
-      type: desarme
-actions:
-  - action: notify.mobile_app_mon_telephone
-    data:
-      title: Ventilation cage d'escalier
-      message: "{{ trigger.event.data.message }}"
-```
-
-Types : `desarme`, `arme`, `defaut`, `temporisation`, `fermeture`, `manuel`, `mode`, `decision`.
+Types : `alarme`, `desarme`, `arme`, `defaut`, `coupure`, `fermeture`, `temporisation`,
+`station`, `manuel`, `manuel_fin`, `mode`, `compteurs`, `decision`.
 
 ## Tests à faire à la mise en service
 

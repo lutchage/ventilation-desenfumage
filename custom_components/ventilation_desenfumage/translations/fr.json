@@ -70,7 +70,10 @@
           "fault_invert": "Inverser l'entrée défaut",
           "ups_battery_states": "États « sur batterie » de l'onduleur (séparés par des virgules)",
           "notify": "Notifications persistantes",
-          "move_hold_s": "Délai sans variation d'angle avant de considérer l'ouvrant arrêté"
+          "move_hold_s": "Délai sans variation d'angle avant de considérer l'ouvrant arrêté",
+          "notify_targets": "Téléphones à notifier (services notify.mobile_app_…)",
+          "notify_events": "Événements à notifier",
+          "notify_url": "Tableau de bord ouvert depuis la notification (ex. /lovelace/ventilation)"
         }
       }
     }

@@ -361,3 +361,84 @@ async def test_movement_detection_blocks_buttons(hass, freezer, monkeypatch):
     await hass.async_block_till_done()
     assert entry.runtime_data.is_moving()
     assert hass.states.get(moving).state == "on"
+
+
+async def _setup_with_notify(hass, freezer, monkeypatch):
+    from pytest_homeassistant_custom_component.common import async_mock_service
+
+    freezer.move_to(_local(hass, 9, 0))
+    _set_base_states(hass)
+    pulses: list[str] = []
+
+    async def _fake_switch(self, service, entity_id):
+        if service == "turn_on":
+            pulses.append(entity_id)
+
+    monkeypatch.setattr(VentilationCoordinator, "_switch", _fake_switch)
+    sent = async_mock_service(hass, "notify", "mobile_app_test")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Ventilation désenfumage",
+        data=DATA,
+        options={"notify_targets": ["mobile_app_test"], "notify_url": "/lovelace/ventilation"},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry, sent, pulses
+
+
+async def test_mobile_notification_on_disarm(hass, freezer, monkeypatch):
+    entry, sent, pulses = await _setup_with_notify(hass, freezer, monkeypatch)
+    await _tick(hass, freezer, timedelta(minutes=10))
+    sent.clear()
+    hass.states.async_set("binary_sensor.ouvrant", "on")
+    await hass.async_block_till_done()
+    assert len(sent) == 1
+    data = sent[0].data
+    assert "Mouvement non commandé" in data["message"]
+    assert data["data"]["url"] == "/lovelace/ventilation"
+    titles = [a["title"] for a in data["data"]["actions"]]
+    assert titles == ["Ouvrir le tableau de bord"]  # pas de « Fermer » : système désarmé
+
+
+async def test_mobile_notification_close_action(hass, freezer, monkeypatch):
+    entry, sent, pulses = await _setup_with_notify(hass, freezer, monkeypatch)
+    # la station météo tombe : notification avec bouton « Fermer »
+    sent.clear()
+    hass.states.async_set("sensor.ws90_gust", "unavailable")
+    await hass.async_block_till_done()
+    assert any("Station météo hors service" in c.data["message"] for c in sent)
+    note = next(c for c in sent if "Station" in c.data["message"])
+    close = note.data["data"]["actions"][0]
+    assert close["title"] == "Fermer"
+    # retour de la station, puis appui sur « Fermer » dans la notification
+    hass.states.async_set("sensor.ws90_gust", "5", {"unit_of_measurement": "m/s"})
+    await hass.async_block_till_done()
+    pulses.clear()
+    hass.bus.async_fire("mobile_app_notification_action", {"action": close["action"]})
+    await hass.async_block_till_done()
+    assert _decision(hass).state == "Commande manuelle"
+    assert pulses == ["switch.shelly_b"]
+
+
+async def test_mobile_notification_events_filter(hass, freezer, monkeypatch):
+    entry, sent, pulses = await _setup_with_notify(hass, freezer, monkeypatch)
+    sent.clear()
+    # commande manuelle : pas notifiée par défaut
+    await hass.services.async_call("button", "press", {"entity_id": f"button.{PREFIX}_fermer"}, blocking=True)
+    await hass.async_block_till_done()
+    assert sent == []
+
+
+async def test_options_flow_notifications(hass, freezer, monkeypatch):
+    from pytest_homeassistant_custom_component.common import async_mock_service
+
+    async_mock_service(hass, "notify", "mobile_app_pixel")
+    entry, on, off = await _setup(hass, freezer, monkeypatch, _local(hass, 9, 0))
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == "form"
+    fields = {str(k): k for k in result["data_schema"].schema}
+    assert "notify_targets" in fields and "notify_events" in fields and "notify_url" in fields
+    sel = result["data_schema"].schema[fields["notify_targets"]]
+    assert any(o["value"] == "mobile_app_pixel" for o in sel.config["options"])

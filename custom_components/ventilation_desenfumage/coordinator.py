@@ -54,6 +54,11 @@ from .const import (
     OPT_FAULT_INVERT,
     OPT_KEEPALIVE_MIN,
     OPT_MOVE_HOLD_S,
+    OPT_NOTIFY_EVENTS,
+    OPT_NOTIFY_TARGETS,
+    OPT_NOTIFY_URL,
+    CLOSE_ACTION_EVENTS,
+    CLOSE_ACTION_PREFIX,
     OPT_NOTIFY,
     OPT_PULSE_S,
     OPT_RESYNC_GRACE_S,
@@ -172,6 +177,7 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
 
         watched = [self.conf[k] for k in ENTITY_KEYS if self.conf.get(k)]
         self._unsubs.append(async_track_state_change_event(self.hass, watched, self._on_state_change))
+        self._unsubs.append(self.hass.bus.async_listen("mobile_app_notification_action", self._on_notification_action))
 
     async def async_shutdown(self) -> None:
         """Arrêter les écoutes et sauvegarder."""
@@ -424,11 +430,11 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
         # Alarme : désarmement immédiat
         alarm = self._alarm_value()
         if alarm and self.settings.armed:
-            self._disarm("Alarme désenfumage signalée par la centrale")
+            self._disarm("Alarme incendie signalée par la centrale", kind="alarme")
 
         # Fin de la commande manuelle
         if self.override and now >= self.override.until:
-            self._log_event("manuel", "Fin de la commande manuelle, retour en automatique")
+            self._log_event("manuel_fin", "Fin de la commande manuelle, retour en automatique")
             self.override = None
             self._save()
 
@@ -480,8 +486,15 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
             previous = self.data
             if previous is None or previous.key != decision.key:
                 self._log_event("decision", f"{decision.label} : {decision.reason}", notify=False)
-                if decision.key == "defaut" and previous is not None:
-                    self._log_event("defaut", decision.reason, notify=True)
+                if previous is not None:
+                    if decision.key == "defaut":
+                        self._log_event("defaut", decision.reason, notify=True)
+                    elif decision.key == "station":
+                        self._log_event("station", f"Station météo hors service : {decision.reason}", notify=True)
+                    if decision.key == "coupure":
+                        self._log_event("coupure", "Coupure de courant : la centrale ferme l'ouvrant sur batterie", notify=True)
+                    elif previous.key == "coupure":
+                        self._log_event("coupure", "Retour du courant", notify=True)
             await self._apply(decision, inputs, now)
             return decision
 
@@ -620,14 +633,14 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
         await self.async_refresh()
 
     @callback
-    def _disarm(self, reason: str) -> None:
+    def _disarm(self, reason: str, kind: str = "desarme") -> None:
         if not self.settings.armed:
             return
         self.settings.armed = False
         self.settings.disarm_reason = reason
         self.last_target = None
         self._save()
-        self._log_event("desarme", f"Système désarmé : {reason}", notify=True)
+        self._log_event(kind, f"Système désarmé : {reason}", notify=True)
 
     async def async_manual(self, target: str, context: Context | None) -> None:
         """Commande manuelle OUVRIR / FERMER depuis le dashboard."""
@@ -645,8 +658,7 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
             f"{'Ouverture' if target == TARGET_OPEN else 'Fermeture'} manuelle"
             f"{f' par {name}' if name else ''} jusqu'à {dt_util.as_local(until):%d.%m %H:%M}",
         )
-        if target == TARGET_OPEN:
-            self.last_target = None  # forcer une nouvelle impulsion
+        self.last_target = None  # toujours envoyer une impulsion pour une commande manuelle
         self._save()
         await self.async_refresh()
 
@@ -678,7 +690,7 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
         """Annuler la commande manuelle."""
         if self.override:
             self.override = None
-            self._log_event("manuel", "Retour en automatique (annulation de la commande manuelle)")
+            self._log_event("manuel_fin", "Retour en automatique (annulation de la commande manuelle)")
             self._save()
         await self.async_refresh()
 
@@ -702,7 +714,61 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
             persistent_notification.async_create(
                 self.hass, f"{now:%d.%m.%Y %H:%M} – {message}", title=DEFAULT_NAME, notification_id=f"{DOMAIN}_{kind}"
             )
+        if kind in (self.opts.get(OPT_NOTIFY_EVENTS) or []):
+            self._notify_mobile(kind, message)
         self._save()
+
+    # ------------------------------------------------------------------
+    # Notifications mobiles
+    # ------------------------------------------------------------------
+
+    @property
+    def _close_action(self) -> str:
+        return f"{CLOSE_ACTION_PREFIX}{self.config_entry.entry_id}"
+
+    @callback
+    def _notify_mobile(self, kind: str | None, message: str) -> None:
+        """Envoyer une notification aux téléphones choisis dans les options."""
+        targets = self.opts.get(OPT_NOTIFY_TARGETS) or []
+        if not targets:
+            return
+        url = self.opts.get(OPT_NOTIFY_URL) or "/lovelace"
+        actions = [{"action": "URI", "title": "Ouvrir le tableau de bord", "uri": url}]
+        if kind in CLOSE_ACTION_EVENTS:
+            actions.insert(0, {"action": self._close_action, "title": "Fermer"})
+        payload = {
+            "title": self.config_entry.title,
+            "message": message,
+            "data": {
+                "tag": f"{DOMAIN}_{kind or 'info'}",
+                "group": DOMAIN,
+                "url": url,
+                "clickAction": url,
+                "actions": actions,
+            },
+        }
+        for target in targets:
+            self.hass.async_create_task(self._send_notification(target, payload))
+
+    async def _send_notification(self, target: str, payload: dict) -> None:
+        service = target.removeprefix("notify.")
+        try:
+            await self.hass.services.async_call("notify", service, payload, blocking=True)
+        except HomeAssistantError as err:
+            _LOGGER.warning("Notification vers notify.%s impossible : %s", service, err)
+
+    @callback
+    def _on_notification_action(self, event: Event) -> None:
+        """Bouton « Fermer » appuyé dans une notification."""
+        if event.data.get("action") != self._close_action:
+            return
+        self.hass.async_create_task(self._close_from_notification(event.context))
+
+    async def _close_from_notification(self, context: Context | None) -> None:
+        try:
+            await self.async_manual(TARGET_CLOSE, context)
+        except HomeAssistantError as err:
+            self._notify_mobile(None, f"Fermeture impossible : {err}")
 
     # ------------------------------------------------------------------
     # Accesseurs pour les entités
