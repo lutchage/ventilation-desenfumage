@@ -528,3 +528,25 @@ async def test_offline_debounce(hass, freezer, monkeypatch):
     async_fire_time_changed(hass, dt_util.utcnow())
     await hass.async_block_till_done()
     assert _decision(hass).state == "Station météo hors service"
+
+
+async def test_card_registered_as_lovelace_resource(hass):
+    from homeassistant.setup import async_setup_component
+
+    from custom_components.ventilation_desenfumage import CARD_URL, async_register_lovelace_resource
+
+    assert await async_setup_component(hass, "lovelace", {})
+    resources = hass.data["lovelace"].resources
+    # ressource ajoutée à la main avec une ancienne version + un doublon
+    await resources.async_load()
+    resources.loaded = True
+    await resources.async_create_item({"res_type": "module", "url": f"{CARD_URL}?v=0.6.0"})
+    await resources.async_create_item({"res_type": "js", "url": CARD_URL})
+
+    assert await async_register_lovelace_resource(hass, f"{CARD_URL}?v=0.7.1")
+    mine = [i for i in resources.async_items() if i["url"].startswith(CARD_URL)]
+    assert len(mine) == 1
+    assert mine[0]["url"] == f"{CARD_URL}?v=0.7.1" and mine[0]["type"] == "module"
+    # deuxième appel : rien ne change
+    assert await async_register_lovelace_resource(hass, f"{CARD_URL}?v=0.7.1")
+    assert len([i for i in resources.async_items() if i["url"].startswith(CARD_URL)]) == 1

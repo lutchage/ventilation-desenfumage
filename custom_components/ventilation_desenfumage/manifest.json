@@ -3,7 +3,8 @@
   "name": "Ventilation désenfumage",
   "after_dependencies": [
     "frontend",
-    "http"
+    "http",
+    "lovelace"
   ],
   "codeowners": [
     "@lutchage"
@@ -17,5 +18,5 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/lutchage/ventilation-desenfumage/issues",
   "requirements": [],
-  "version": "0.7.0"
+  "version": "0.7.1"
 }

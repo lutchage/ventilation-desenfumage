@@ -137,8 +137,12 @@ l'emploi (vue « Ouvrant » + vue « Réglages »). Remplacer les lignes marqué
 
 ## Carte graphique
 
-L'intégration fournit sa propre carte, chargée automatiquement dans Home Assistant
-(aucune ressource à ajouter) :
+L'intégration fournit sa propre carte. Au démarrage, elle l'ajoute automatiquement aux
+**ressources des tableaux de bord** (Paramètres > Tableaux de bord > Ressources) et met à jour
+son numéro de version à chaque mise à jour : Home Assistant attend ainsi que la carte soit
+chargée avant de l'afficher (pas d'erreur « Configuration error »). Si vos tableaux de bord
+sont en mode YAML, ajoutez vous-même la ressource
+`/ventilation_desenfumage/ventilation-desenfumage-card.js` (type module).
 
 ```yaml
 type: custom:ventilation-desenfumage-card
