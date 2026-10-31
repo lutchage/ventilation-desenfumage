@@ -314,3 +314,50 @@ async def test_manual_buttons_blocked_from_level_4(hass, freezer, monkeypatch):
     await hass.services.async_call(
         "button", "press", {"entity_id": f"button.{PREFIX}_retour_en_automatique"}, blocking=True
     )
+
+
+async def test_movement_detection_blocks_buttons(hass, freezer, monkeypatch):
+    freezer.move_to(_local(hass, 9, 0))
+    _set_base_states(hass)
+    hass.states.async_set("sensor.tilt", "0")
+    calls: list[str] = []
+
+    async def _fake_switch(self, service, entity_id):
+        calls.append(f"{service}:{entity_id}")
+
+    monkeypatch.setattr(VentilationCoordinator, "_switch", _fake_switch)
+    entry = MockConfigEntry(domain=DOMAIN, title="Ventilation désenfumage", data={**DATA, "door_tilt": "sensor.tilt"})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    moving = f"binary_sensor.{PREFIX}_ouvrant_en_mouvement"
+    assert hass.states.get(moving).state == "off"
+
+    # Ouverture : en mouvement dès l'impulsion, boutons refusés
+    await hass.services.async_call("button", "press", {"entity_id": f"button.{PREFIX}_ouvrir"}, blocking=True)
+    await hass.async_block_till_done()
+    assert entry.runtime_data.is_moving()
+    with pytest.raises(HomeAssistantError, match="mouvement"):
+        await hass.services.async_call("button", "press", {"entity_id": f"button.{PREFIX}_fermer"}, blocking=True)
+
+    # l'angle évolue toutes les 4 s, puis se stabilise à 112°
+    hass.states.async_set("binary_sensor.ouvrant", "on")
+    for angle in (20, 45, 70, 95, 112):
+        await _tick(hass, freezer, timedelta(seconds=4))
+        hass.states.async_set("sensor.tilt", str(angle))
+        await hass.async_block_till_done()
+        assert entry.runtime_data.is_moving()
+    await _tick(hass, freezer, timedelta(seconds=9))
+    assert not entry.runtime_data.is_moving()
+    assert hass.states.get(moving).state == "off"
+    assert _decision(hass).attributes["en_mouvement"] is False
+
+    # impulsion de maintien sur un ouvrant déjà ouvert : pas de mouvement attendu
+    await _tick(hass, freezer, timedelta(minutes=5))
+    assert not entry.runtime_data.is_moving()
+
+    # mouvement sans impulsion (bouton de maintenance) : détecté par l'angle
+    hass.states.async_set("sensor.tilt", "90")
+    await hass.async_block_till_done()
+    assert entry.runtime_data.is_moving()
+    assert hass.states.get(moving).state == "on"

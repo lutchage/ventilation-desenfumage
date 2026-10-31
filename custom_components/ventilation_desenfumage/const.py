@@ -81,6 +81,7 @@ OPT_DEBOUNCE_S = "debounce_s"
 OPT_UPS_STATES = "ups_battery_states"
 OPT_ALLOWED_USERS = "allowed_users"
 OPT_NOTIFY = "notify"
+OPT_MOVE_HOLD_S = "move_hold_s"
 
 DEFAULT_OPTIONS = {
     OPT_PULSE_S: 1.0,
@@ -96,7 +97,10 @@ DEFAULT_OPTIONS = {
     OPT_UPS_STATES: "on,ob,on battery,on_battery,onbattery,discharging,sur batterie",
     OPT_ALLOWED_USERS: [],
     OPT_NOTIFY: True,
+    OPT_MOVE_HOLD_S: 8,
 }
 
 UPDATE_INTERVAL_S = 30
 SAMPLE_INTERVAL_MIN = 5
+OPEN_ANGLE_MIN = 90  # angle au-delà duquel l'ouvrant est considéré grand ouvert
+CLOSED_ANGLE_MAX = 3  # angle en dessous duquel il est considéré fermé

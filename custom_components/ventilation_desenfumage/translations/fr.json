@@ -69,7 +69,8 @@
           "alarm_invert": "Inverser l'entrée alarme",
           "fault_invert": "Inverser l'entrée défaut",
           "ups_battery_states": "États « sur batterie » de l'onduleur (séparés par des virgules)",
-          "notify": "Notifications persistantes"
+          "notify": "Notifications persistantes",
+          "move_hold_s": "Délai sans variation d'angle avant de considérer l'ouvrant arrêté"
         }
       }
     }

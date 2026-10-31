@@ -69,7 +69,8 @@
           "alarm_invert": "Invert alarm input",
           "fault_invert": "Invert fault input",
           "ups_battery_states": "UPS on-battery states (comma separated)",
-          "notify": "Persistent notifications"
+          "notify": "Persistent notifications",
+          "move_hold_s": "Seconds without angle change before the window is considered stopped"
         }
       }
     }

@@ -72,6 +72,7 @@ class DecisionSensor(VentilationEntity, SensorEntity):
             "derniere_impulsion_fermer": c.last_close_pulse.isoformat() if c.last_close_pulse else None,
             "trace": d.trace_dicts(),
             "entites": c.entity_map(),
+            "en_mouvement": c.is_moving(),
         }
 
 

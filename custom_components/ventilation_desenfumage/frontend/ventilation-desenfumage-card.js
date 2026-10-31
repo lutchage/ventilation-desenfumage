@@ -9,7 +9,7 @@
  * sont lues dans l'attribut « entites » du capteur de décision.
  */
 
-const CARD_VERSION = "0.4.0";
+const CARD_VERSION = "0.5.0";
 
 const MAX_ANGLE = 120; // ouverture maximale de la coupole (°)
 const MANUAL_BLOCK_PRIORITY = 4; // boutons Ouvrir / Fermer bloqués à partir de ce niveau
@@ -33,6 +33,7 @@ const SHORT_LABEL = {
 };
 
 const SEASON_LABEL = { froid: "Froid", normal: "Normal", canicule: "Canicule" };
+const SEASON_COLOR = { froid: "#1e88e5", normal: "#00897b", canicule: "#fb8c00" };
 const SEASON_ICON = { froid: "mdi:snowflake", normal: "mdi:weather-partly-cloudy", canicule: "mdi:white-balance-sunny" };
 
 // Géométrie de la scène (viewBox 400 x 260) : coupe de l'immeuble du milieu du
@@ -152,7 +153,7 @@ class VentilationDesenfumageCard extends HTMLElement {
     const tilt = num(this._st("door_tilt"));
     let angle = 0;
     if (isOpen) angle = tilt !== null ? Math.max(15, Math.min(MAX_ANGLE, tilt)) : 45;
-    const doorText = !doorKnown ? "État inconnu" : isOpen ? (tilt !== null ? `Ouvert ${Math.round(tilt)}°` : "Ouvert") : "Fermé";
+    let doorText = !doorKnown ? "État inconnu" : isOpen ? (tilt !== null ? `Ouvert ${Math.round(tilt)}°` : "Ouvert") : "Fermé";
 
     // --- Mesures
     const tIn = num(this._st("indoor_temp"));
@@ -173,8 +174,9 @@ class VentilationDesenfumageCard extends HTMLElement {
 
     // --- Boutons manuels : bloqués si système désarmé ou niveau prioritaire actif
     const prio = Number(a.priorite ?? 0);
-    const manualOk = isArmedFor(hass, ent) && prio < MANUAL_BLOCK_PRIORITY;
-    const manualWhy = manualOk ? "" : `Commande impossible : ${dec.state}`;
+    const moving = a.en_mouvement === true;
+    const manualOk = isArmedFor(hass, ent) && prio < MANUAL_BLOCK_PRIORITY && !moving;
+    const manualWhy = manualOk ? "" : moving ? "Ouvrant en mouvement" : `Commande impossible : ${dec.state}`;
 
     // --- Chips
     const armed = hass.states[ent.armed_switch];
@@ -189,6 +191,8 @@ class VentilationDesenfumageCard extends HTMLElement {
       if (!isNaN(d)) ovText = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     }
 
+    if (a.en_mouvement === true) doorText = `En mouvement${tilt !== null ? ` · ${Math.round(tilt)}°` : ""}`;
+
     // --- Coupole : rotation autour de la charnière gauche, le côté droit se soulève
     const rad = (angle * Math.PI) / 180;
     const arm = 0.55 * (DOME_R - DOME_L); // point d'attache du vérin sur le cadre
@@ -201,14 +205,21 @@ class VentilationDesenfumageCard extends HTMLElement {
     steps.push(`${sx},${sy}`);
     const stairEndX = sx;
 
-    const pipeline = trace
+    const ladder = trace
       .map((t) => {
         const win = t.key === key;
         const c = LEVEL_COLORS[t.key] || LEVEL_COLORS.defaut_ferme;
-        return `<div class="lvl ${t.active ? "on" : ""} ${win ? "win" : ""}" style="--c:${c}" title="${esc(t.priority + " – " + t.label + (t.reason ? " : " + t.reason : ""))}">
-          <span class="p">${t.priority}</span><span class="n">${esc(SHORT_LABEL[t.key] || t.label)}</span></div>`;
+        if (win) {
+          return `<div class="lvl win" style="--c:${c}" data-mi="__decision">
+            <div class="wh"><span class="p">${t.priority}</span><span class="n">${esc(t.label)}</span></div>
+            ${t.reason ? `<div class="r">${esc(t.reason)}</div>` : ""}</div>`;
+        }
+        return `<div class="lvl ${t.active ? "on" : ""}" style="--c:${c}" title="${esc(t.reason || "")}">
+          <span class="p">${t.priority}</span><span class="n">${esc(t.label)}</span></div>`;
       })
       .join("");
+    const seasonColor = SEASON_COLOR[seasonVal] || "var(--secondary-text-color,#727272)";
+    const armedColor = isArmed ? "var(--success-color,#43a047)" : "var(--error-color,#db4437)";
 
     root.innerHTML = `
       <style>${STYLE}</style>
@@ -217,9 +228,22 @@ class VentilationDesenfumageCard extends HTMLElement {
           <div class="badge" style="background:${color}"><ha-icon icon="${isOpen ? "mdi:window-open-variant" : "mdi:window-closed-variant"}"></ha-icon></div>
           <div class="title">
             <div class="t1">${esc(this._config.title || "Ouvrant cage d'escalier")}</div>
-            <div class="t2"><b style="color:${color}">${esc(dec.state)}</b> · ${esc(a.raison || "")}</div>
           </div>
         </div>
+
+        <div class="status">
+          <div class="pill" style="--c:${seasonColor}" data-mi="season">
+            <ha-icon icon="${SEASON_ICON[seasonVal] || "mdi:calendar"}"></ha-icon>
+            <div><div class="pl">Mode</div><div class="pv">${esc(SEASON_LABEL[seasonVal] || "–")}</div>
+            ${avg !== null ? `<div class="ps">moy. 24 h ${avg.toFixed(1)}°</div>` : ""}</div>
+          </div>
+          <div class="pill" style="--c:${armedColor}" data-mi="armed_switch">
+            <ha-icon icon="${isArmed ? "mdi:shield-check" : "mdi:shield-off"}"></ha-icon>
+            <div><div class="pl">Système</div><div class="pv">${isArmed ? "Armé" : "Désarmé"}</div></div>
+          </div>
+        </div>
+
+        <div class="body"><div class="main">
 
         <svg class="scene" viewBox="0 0 400 260" role="img" aria-label="${esc(doorText)}">
           <defs>
@@ -235,7 +259,7 @@ class VentilationDesenfumageCard extends HTMLElement {
             : `<circle cx="24" cy="22" r="12" fill="#ffc94a"/>`}
 
           ${windy ? `<g class="wind">
-              <path d="M60 84 Q90 76 120 84" /><path d="M150 16 Q196 6 242 16" /><path d="M200 70 Q240 62 270 70" />
+              <path d="M60 84 Q90 76 120 84" /><path d="M136 14 Q176 4 216 14" /><path d="M120 54 Q150 46 180 54" />
             </g>` : ""}
 
           ${raining ? `<g class="rain">${[20, 70, 100, 140, 210, 250, 300, 340, 380].map((x, i) =>
@@ -279,7 +303,7 @@ class VentilationDesenfumageCard extends HTMLElement {
           <line class="jack" x1="${DOME_R - 10}" y1="${ROOF_Y + 2}" x2="${jackTop.x.toFixed(1)}" y2="${jackTop.y.toFixed(1)}"/>
 
           <!-- coupole (charnière à gauche) -->
-          <g class="dome ${isOpen ? "open" : ""} ${doorKnown ? "" : "unknown"}" transform="rotate(${-angle} ${DOME_L} ${DOME_Y})">
+          <g class="dome ${isOpen ? "open" : ""} ${doorKnown ? "" : "unknown"} ${moving ? "moving" : ""}" transform="rotate(${-angle} ${DOME_L} ${DOME_Y})">
             <path d="M${DOME_L} ${DOME_Y} A${domeW / 2} ${DOME_H} 0 0 1 ${DOME_R} ${DOME_Y} Z"/>
             <line x1="${DOME_L - 2}" y1="${DOME_Y}" x2="${DOME_R + 2}" y2="${DOME_Y}" class="rim"/>
             <path d="M${DOME_L + 16} ${DOME_Y - 8} Q${DOME_L + 24} ${DOME_Y - DOME_H + 4} ${DOME_L + 40} ${DOME_Y - DOME_H + 2}" class="shine"/>
@@ -294,10 +318,11 @@ class VentilationDesenfumageCard extends HTMLElement {
 
           <!-- étiquettes -->
           <g class="lbl" data-mi="outdoor_temp">
-            <rect x="276" y="8" width="64" height="${hOut !== null ? 52 : 38}" rx="6"/>
-            <text x="308" y="21" text-anchor="middle" class="cap">Extérieur</text>
-            <text x="308" y="38" text-anchor="middle" class="big">${fmt(tOut, "°")}</text>
-            ${hOut !== null ? `<text x="308" y="53" text-anchor="middle" class="small">${fmt(hOut, " %", 0)}</text>` : ""}
+            <rect x="244" y="4" width="98" height="76" rx="6"/>
+            <text x="293" y="16" text-anchor="middle" class="cap">Extérieur</text>
+            <text x="293" y="33" text-anchor="middle" class="big">${fmt(tOut, "°")}${hOut !== null ? `<tspan class="small"> · ${fmt(hOut, " %", 0)}</tspan>` : ""}</text>
+            <text x="293" y="51" text-anchor="middle" class="small ${raining ? "alert" : ""}">Pluie ${rain === null ? "–" : `${rain.toFixed(1)} mm/h`}</text>
+            <text x="293" y="67" text-anchor="middle" class="small ${windy ? "alert" : ""}">Rafales ${gust === null ? "–" : `${gust.toFixed(0)} ${esc(gustUnit)}`}</text>
           </g>
 
           <g class="lbl" data-mi="indoor_temp">
@@ -308,23 +333,19 @@ class VentilationDesenfumageCard extends HTMLElement {
           </g>
 
           <g class="lbl door" data-mi="door">
-            <rect x="28" y="${ROOF_Y + 12}" width="88" height="22" rx="11"/>
-            <text x="72" y="${ROOF_Y + 27}" text-anchor="middle" class="small b">${esc(doorText)}</text>
+            <rect x="26" y="${ROOF_Y + 12}" width="${moving ? 118 : 92}" height="22" rx="11"/>
+            <text x="${moving ? 85 : 72}" y="${ROOF_Y + 27}" text-anchor="middle" class="small b">${esc(doorText)}</text>
           </g>
 
           ${!isArmed ? `<g class="stamp"><rect x="230" y="222" width="140" height="26" rx="13"/><text x="300" y="240" text-anchor="middle">SYSTÈME DÉSARMÉ</text></g>` : ""}
         </svg>
-
-        <div class="chips">
-          <div class="chip" data-mi="season"><ha-icon icon="${SEASON_ICON[seasonVal] || "mdi:calendar"}"></ha-icon>
-            ${esc(SEASON_LABEL[seasonVal] || "–")}${avg !== null ? ` · moy. ${avg.toFixed(1)}°` : ""}</div>
-          <div class="chip ${isArmed ? "" : "bad"}" data-mi="armed_switch"><ha-icon icon="${isArmed ? "mdi:shield-check" : "mdi:shield-off"}"></ha-icon>${isArmed ? "Armé" : "Désarmé"}</div>
-          <div class="chip ${raining ? "info" : ""}" data-mi="rain_rate"><ha-icon icon="mdi:weather-rainy"></ha-icon>${rain === null ? "–" : `${rain.toFixed(1)} mm/h`}</div>
-          <div class="chip ${windy ? "info" : ""}" data-mi="wind_gust"><ha-icon icon="mdi:weather-windy"></ha-icon>${gust === null ? "–" : `${gust.toFixed(0)} ${esc(gustUnit)}`}</div>
+        ${ovText || moving ? `<div class="chips">
+          ${moving ? `<div class="chip warn" data-mi="door_tilt"><ha-icon icon="mdi:arrow-up-down"></ha-icon>En mouvement…</div>` : ""}
           ${ovText ? `<div class="chip prim" data-mi="override_end"><ha-icon icon="mdi:hand-back-right"></ha-icon>Manuel jusqu'à ${ovText}</div>` : ""}
+        </div>` : ""}
         </div>
-
-        ${this._config.show_pipeline ? `<div class="pipe">${pipeline}</div>` : ""}
+        ${this._config.show_pipeline ? `<div class="ladder">${ladder}</div>` : ""}
+        </div>
 
         ${this._config.show_buttons ? `<div class="btns">
           <button class="open" data-act="open" ${manualOk ? "" : "disabled"} title="${esc(manualWhy)}"><ha-icon icon="mdi:arrow-up-bold"></ha-icon>Ouvrir</button>
@@ -345,7 +366,7 @@ class VentilationDesenfumageCard extends HTMLElement {
 
 const STYLE = `
   :host { display:block; }
-  ha-card { padding:12px 12px 14px; overflow:hidden; }
+  ha-card { padding:12px 12px 14px; overflow:hidden; container-type:inline-size; }
   ha-card.alarm { animation: alarm 1s steps(2) infinite; }
   @keyframes alarm { 50% { box-shadow: 0 0 0 3px var(--error-color,#db4437) inset; } }
   .warn { padding:16px; color: var(--error-color,#db4437); }
@@ -353,8 +374,16 @@ const STYLE = `
   .badge { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; flex:none; }
   .title { min-width:0; }
   .t1 { font-size:16px; font-weight:500; color:var(--primary-text-color); }
-  .t2 { font-size:13px; color:var(--secondary-text-color); line-height:1.35; }
-  .scene { width:100%; height:auto; display:block; margin:10px 0 6px; border-radius:12px; }
+  .status { display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:10px; }
+  .pill { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; cursor:pointer; color:#fff; background: var(--c); }
+  .pill ha-icon { --mdc-icon-size:28px; flex:none; }
+  .pill .pl { font-size:11px; opacity:.85; text-transform:uppercase; letter-spacing:.5px; }
+  .pill .pv { font-size:18px; font-weight:600; line-height:1.15; }
+  .pill .ps { font-size:11px; opacity:.85; }
+  .body { display:grid; grid-template-columns: minmax(0, 1.9fr) minmax(150px, 1fr); gap:10px; align-items:start; margin-top:10px; }
+  @container (max-width: 520px) { .body { grid-template-columns: 1fr; } }
+  .main { min-width:0; }
+  .scene { width:100%; height:auto; display:block; margin:0 0 6px; border-radius:12px; }
   .inside { fill: var(--secondary-background-color, #f2f2f2); }
   .roof { fill:none; stroke: var(--primary-text-color,#212121); stroke-width:10; stroke-linecap:butt; opacity:.8; }
   .wall { fill:none; stroke: var(--primary-text-color,#212121); stroke-width:10; opacity:.8; }
@@ -383,8 +412,11 @@ const STYLE = `
   .lbl rect { fill: var(--card-background-color,#fff); opacity:.92; stroke: var(--divider-color,#e0e0e0); }
   .lbl.door rect { fill: var(--card-background-color,#fff); }
   text { fill: var(--primary-text-color,#212121); font-family: var(--ha-font-family-body, Roboto, sans-serif); }
-  text.big { font-size:15px; font-weight:600; }
-  text.small { font-size:11px; }
+  text.big { font-size:16px; font-weight:600; }
+  text.small, tspan.small { font-size:11.5px; font-weight:400; }
+  text.alert { fill: var(--info-color,#039be5); font-weight:700; }
+  .dome.moving path:first-child, .dome.moving .rim { animation: blink 1s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity:.4; } }
   text.b { font-weight:600; }
   text.cap { font-size:10px; fill: var(--secondary-text-color,#727272); }
   .stamp rect { fill: var(--error-color,#db4437); }
@@ -395,16 +427,18 @@ const STYLE = `
   .chip ha-icon { --mdc-icon-size:16px; color: var(--secondary-text-color); }
   .chip.bad { background: var(--error-color,#db4437); color:#fff; } .chip.bad ha-icon { color:#fff; }
   .chip.info { background: var(--info-color,#039be5); color:#fff; } .chip.info ha-icon { color:#fff; }
+  .chip.warn { background: var(--warning-color,#ffa600); color:#fff; } .chip.warn ha-icon { color:#fff; }
   .chip.prim { background: var(--primary-color,#03a9f4); color:#fff; } .chip.prim ha-icon { color:#fff; }
-  .pipe { display:grid; grid-template-columns: repeat(10, 1fr); gap:3px; margin-top:12px; }
-  .lvl { display:flex; flex-direction:column; align-items:center; gap:2px; padding:5px 1px 4px; border-radius:6px;
-         background: var(--secondary-background-color,#f2f2f2); opacity:.55; min-width:0; }
-  .lvl .p { font-size:12px; font-weight:700; color: var(--secondary-text-color); }
-  .lvl .n { font-size:10px; line-height:1.1; text-align:center; color: var(--secondary-text-color);
-            overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-  .lvl.on { opacity:1; box-shadow: inset 0 -3px 0 var(--c); }
-  .lvl.win { background: var(--c); opacity:1; box-shadow:none; }
-  .lvl.win .p, .lvl.win .n { color:#fff; }
+  .ladder { display:flex; flex-direction:column; gap:3px; }
+  .lvl { display:flex; align-items:center; gap:8px; padding:3px 8px; border-radius:6px; font-size:12px; line-height:1.25;
+         color: var(--secondary-text-color); background: var(--secondary-background-color,#f2f2f2); opacity:.6;
+         border-left:4px solid transparent; }
+  .lvl .p { font-weight:700; min-width:16px; text-align:right; }
+  .lvl.on { opacity:1; border-left-color: var(--c); color: var(--primary-text-color); }
+  .lvl.win { display:block; background: var(--c); color:#fff; opacity:1; padding:10px 12px; border-left:none; cursor:pointer; margin:3px 0; }
+  .lvl.win .wh { display:flex; align-items:baseline; gap:8px; font-size:16px; font-weight:600; }
+  .lvl.win .p { font-size:20px; }
+  .lvl.win .r { font-size:13px; margin-top:4px; line-height:1.35; opacity:.95; }
   .btns { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-top:12px; }
   button { display:flex; align-items:center; justify-content:center; gap:6px; border:none; border-radius:10px; padding:10px 6px;
            font-size:14px; font-weight:500; cursor:pointer; color:#fff; font-family: inherit; }

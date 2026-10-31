@@ -49,6 +49,8 @@ DESCRIPTIONS = [
           lambda c: _trace_active(c, "manuel")),
     _Desc("demande_ventilation", "Demande de ventilation", None, "mdi:fan",
           lambda c: _trace_active(c, "ventilation")),
+    _Desc("en_mouvement", "Ouvrant en mouvement", BinarySensorDeviceClass.MOVING, "mdi:arrow-up-down",
+          lambda c: c.is_moving()),
 ]
 
 

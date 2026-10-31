@@ -53,6 +53,7 @@ from .const import (
     OPT_DEBOUNCE_S,
     OPT_FAULT_INVERT,
     OPT_KEEPALIVE_MIN,
+    OPT_MOVE_HOLD_S,
     OPT_NOTIFY,
     OPT_PULSE_S,
     OPT_RESYNC_GRACE_S,
@@ -62,6 +63,8 @@ from .const import (
     SAMPLE_INTERVAL_MIN,
     STORAGE_VERSION,
     UPDATE_INTERVAL_S,
+    CLOSED_ANGLE_MAX,
+    OPEN_ANGLE_MIN,
 )
 from .logic import (
     MOVE_CENTRAL_TIMER,
@@ -136,6 +139,9 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
         self._started_at = dt_util.utcnow()
         self._shellys_online_since: datetime | None = None
         self._entity_map: dict[str, str | None] | None = None
+        # Détection du mouvement de l'ouvrant
+        self._angle_changed_at: datetime | None = None
+        self._expected_move: tuple[str, datetime] | None = None  # (cible, instant de l'impulsion)
 
     # ------------------------------------------------------------------
     # Cycle de vie
@@ -244,6 +250,8 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
     def _on_state_change(self, event: Event[EventStateChangedData]) -> None:
         now = dt_util.utcnow()
         self._update_online(now)
+        if event.data["entity_id"] == self.conf.get(CONF_DOOR_TILT):
+            self._track_angle(event.data["old_state"], event.data["new_state"], now)
         if event.data["entity_id"] == self.conf.get(CONF_DOOR):
             self._count_movement(event.data["new_state"])
             self._handle_door(event.data["old_state"], event.data["new_state"], now)
@@ -546,6 +554,16 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
             _LOGGER.error("Échec de l'impulsion %s : %s", target, err)
             return
 
+        already = self._door_open()
+        tilt = self._float(CONF_DOOR_TILT)
+        if target == TARGET_OPEN:
+            at_target = already is True and (tilt is None or tilt >= OPEN_ANGLE_MIN)
+        else:
+            at_target = already is False and (tilt is None or tilt <= CLOSED_ANGLE_MAX)
+        if not at_target:
+            # un mouvement est attendu (pas pour les impulsions de maintien)
+            self._expected_move = (target, now)
+            self._schedule_listeners_update(self.opts[OPT_TRAVEL_S] + 0.5)
         if target == TARGET_OPEN:
             self.last_open_pulse = now
             self.counters["impulsions_ouvrir"] += 1
@@ -617,6 +635,8 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
             raise HomeAssistantError("Système désarmé : réarmer avant de commander l'ouvrant")
         if self.data is not None and self.data.priority >= MANUAL_BLOCK_PRIORITY:
             raise HomeAssistantError(f"Commande impossible : {self.data.label}")
+        if self.is_moving():
+            raise HomeAssistantError("Commande impossible : ouvrant en mouvement")
         name = await self._user_name(context)
         until = dt_util.utcnow() + timedelta(hours=self.settings.override_hours)
         self.override = Override(target, until, name)
@@ -712,6 +732,64 @@ class VentilationCoordinator(DataUpdateCoordinator[Decision]):
                 self._entity_map = mapping  # mise en cache une fois tout enregistré
             return mapping
         return self._entity_map
+
+    # ------------------------------------------------------------------
+    # Mouvement de l'ouvrant
+    # ------------------------------------------------------------------
+
+    @callback
+    def _schedule_listeners_update(self, delay: float) -> None:
+        """Republier l'état des entités après un délai (fin de mouvement)."""
+
+        @callback
+        def _update(_now: datetime) -> None:
+            self.async_update_listeners()
+
+        async_call_later(self.hass, delay, _update)
+
+    @callback
+    def _track_angle(self, old: State | None, new: State | None, now: datetime) -> None:
+        """Noter l'instant de chaque variation d'angle (capteur toutes les 3 à 5 s en mouvement)."""
+        try:
+            a = float(old.state) if old else None
+            b = float(new.state) if new else None
+        except ValueError:
+            return
+        if a is None or b is None or abs(b - a) < 1:
+            return
+        self._angle_changed_at = now
+        self._schedule_listeners_update(self.opts[OPT_MOVE_HOLD_S] + 0.5)
+
+    def is_moving(self, now: datetime | None = None) -> bool:
+        """Vrai si l'ouvrant est en mouvement.
+
+        - l'angle a varié depuis moins de « move_hold_s » secondes (quelle que soit
+          l'origine du mouvement, bouton de maintenance compris) ;
+        - ou une impulsion a été envoyée depuis moins que le temps de course et la
+          position finale n'est pas encore atteinte.
+        """
+        now = now or dt_util.utcnow()
+        hold = timedelta(seconds=self.opts[OPT_MOVE_HOLD_S])
+        if self._angle_changed_at and now - self._angle_changed_at < hold:
+            return True
+        if self._expected_move is None:
+            return False
+        target, sent = self._expected_move
+        if now - sent >= timedelta(seconds=self.opts[OPT_TRAVEL_S]):
+            self._expected_move = None
+            return False
+        door = self._door_open()
+        tilt = self._float(CONF_DOOR_TILT)
+        if target == TARGET_CLOSE:
+            if door is False and (tilt is None or tilt <= CLOSED_ANGLE_MAX):
+                self._expected_move = None
+                return False
+            return True
+        # Ouverture : terminée quand l'angle a bougé puis s'est stabilisé
+        if tilt is not None and self._angle_changed_at and self._angle_changed_at > sent:
+            self._expected_move = None
+            return False
+        return True
 
     @property
     def door_tilt(self) -> float | None:

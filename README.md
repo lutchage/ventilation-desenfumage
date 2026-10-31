@@ -139,11 +139,28 @@ show_buttons: true               # optionnel : boutons Ouvrir / Fermer / Auto
 
 ![Carte graphique](images/carte.png)
 
-Elle affiche une coupe de l'immeuble (milieu du niveau 3 jusqu'au toit plat) avec l'escalier, les panneaux solaires, le mât de la WS90 et la coupole à son angle réel (capteur d'inclinaison),
-le flux d'air quand l'ouvrant est ouvert, la pluie et le vent, le jour ou la nuit, les
-températures et humidités intérieures et extérieures, le mode saisonnier, l'état armé,
-la commande manuelle en cours, le niveau gagnant du pipeline et les boutons de commande.
+La carte comprend :
+
+- **deux grandes pastilles** : le mode saisonnier (Froid / Normal / Canicule, avec la moyenne
+  24 h) et l'état du système (Armé / Désarmé) ;
+- **la coupe de l'immeuble** (milieu du niveau 3 jusqu'au toit plat) avec l'escalier, les
+  panneaux solaires, le mât de la WS90 et la coupole à son angle réel, le flux d'air, la pluie
+  et le vent animés, le jour ou la nuit ; l'étiquette « Extérieur » regroupe température,
+  humidité, pluie et rafales ;
+- **l'échelle des 10 niveaux**, verticale à droite du schéma (dessous sur téléphone) :
+  le niveau actif est agrandi et affiche sa raison ;
+- **les boutons Ouvrir / Fermer / Auto** : Ouvrir et Fermer sont grisés quand le système est
+  désarmé, à partir du niveau 4, ou **pendant le mouvement de l'ouvrant**.
+
 Un clic sur un élément ouvre la fiche de l'entité. En cas d'alarme, le cadre clignote en rouge.
+
+### Détection du mouvement
+
+L'ouvrant est considéré en mouvement si l'angle du capteur BLU Door a varié depuis moins
+de 8 s (réglable, le capteur envoie l'angle toutes les 3 à 5 s pendant la course), ou si une
+impulsion vient d'être envoyée et que la position finale n'est pas encore atteinte (au plus
+le temps de course). Pendant ce temps, Ouvrir et Fermer sont refusés. Le capteur binaire
+« Ouvrant en mouvement » expose cet état.
 
 Les autres entités sont trouvées automatiquement grâce à l'attribut `entites` du
 capteur de décision.
