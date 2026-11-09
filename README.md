@@ -166,6 +166,8 @@ La carte comprend :
   le niveau actif est agrandi et affiche sa raison ;
 - **les boutons Ouvrir / Fermer / Auto** : Ouvrir et Fermer sont grisés quand le système est
   désarmé, à partir du niveau 4, ou **pendant le mouvement de l'ouvrant**.
+  Ouvrir et Fermer demandent une **confirmation dans la carte** (Confirmer / Annuler, annulée
+  automatiquement après 8 s) ; un refus de commande s'affiche directement dans la carte.
 
 Un clic sur un élément ouvre la fiche de l'entité. En cas d'alarme, le cadre clignote en rouge.
 

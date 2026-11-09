@@ -58,6 +58,8 @@ views:
               perform_action: button.press
               target:
                 entity_id: button.ventilation_desenfumage_fermer
+              confirmation:
+                text: Fermer l'ouvrant ? La commande manuelle reste prioritaire pendant la durée réglée.
           - type: tile
             entity: button.ventilation_desenfumage_retour_en_automatique
             name: Retour en auto

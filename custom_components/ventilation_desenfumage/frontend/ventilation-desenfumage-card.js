@@ -9,7 +9,7 @@
  * sont lues dans l'attribut « entites » du capteur de décision.
  */
 
-const CARD_VERSION = "0.5.0";
+const CARD_VERSION = "0.7.2";
 
 const MAX_ANGLE = 120; // ouverture maximale de la coupole (°)
 const MANUAL_BLOCK_PRIORITY = 4; // boutons Ouvrir / Fermer bloqués à partir de ce niveau
@@ -116,14 +116,37 @@ class VentilationDesenfumageCard extends HTMLElement {
     return id ? this._hass.states[id] : undefined;
   }
 
-  _press(key, confirmText) {
+  _press(key) {
     const dec = this._hass.states[this._config.entity];
     const id = dec.attributes.entites[key];
     if (!id) return;
-    if (confirmText && !window.confirm(confirmText)) return;
     this._hass.callService("button", "press", { entity_id: id }).catch((err) => {
-      window.alert(err && err.message ? err.message : String(err));
+      this._showMessage(err && err.message ? err.message : String(err));
     });
+  }
+
+  // Confirmation dans la carte (les fenêtres du navigateur ne s'affichent pas
+  // toujours dans l'application mobile)
+  _askConfirm(act) {
+    clearTimeout(this._confirmTimer);
+    this._confirm = act;
+    this._confirmTimer = setTimeout(() => { this._confirm = null; this._render(); }, 8000);
+    this._render();
+  }
+
+  _answerConfirm(yes) {
+    const act = this._confirm;
+    clearTimeout(this._confirmTimer);
+    this._confirm = null;
+    this._render();
+    if (yes && act) this._press(act === "open" ? "open_button" : "close_button");
+  }
+
+  _showMessage(text) {
+    clearTimeout(this._msgTimer);
+    this._msg = text;
+    this._msgTimer = setTimeout(() => { this._msg = null; this._render(); }, 8000);
+    this._render();
   }
 
   _moreInfo(key) {
@@ -177,6 +200,10 @@ class VentilationDesenfumageCard extends HTMLElement {
     const moving = a.en_mouvement === true;
     const manualOk = isArmedFor(hass, ent) && prio < MANUAL_BLOCK_PRIORITY && !moving;
     const manualWhy = manualOk ? "" : moving ? "Ouvrant en mouvement" : `Commande impossible : ${dec.state}`;
+    if (this._confirm && !manualOk) {
+      clearTimeout(this._confirmTimer);
+      this._confirm = null;
+    }
 
     // --- Chips
     const armed = hass.states[ent.armed_switch];
@@ -347,19 +374,27 @@ class VentilationDesenfumageCard extends HTMLElement {
         ${this._config.show_pipeline ? `<div class="ladder">${ladder}</div>` : ""}
         </div>
 
-        ${this._config.show_buttons ? `<div class="btns">
+        ${this._msg ? `<div class="msg"><ha-icon icon="mdi:alert-circle-outline"></ha-icon>${esc(this._msg)}</div>` : ""}
+        ${!this._config.show_buttons ? "" : this._confirm ? `<div class="btns confirm ${this._confirm}">
+          <div class="q"><b>${this._confirm === "open" ? "Ouvrir la coupole ?" : "Fermer la coupole ?"}</b>
+            <span>Commande manuelle prioritaire, puis retour en automatique.</span></div>
+          <button class="${this._confirm}" data-act="yes"><ha-icon icon="mdi:check-bold"></ha-icon>Confirmer</button>
+          <button class="auto" data-act="no"><ha-icon icon="mdi:close-thick"></ha-icon>Annuler</button>
+        </div>` : `<div class="btns">
           <button class="open" data-act="open" ${manualOk ? "" : "disabled"} title="${esc(manualWhy)}"><ha-icon icon="mdi:arrow-up-bold"></ha-icon>Ouvrir</button>
           <button class="close" data-act="close" ${manualOk ? "" : "disabled"} title="${esc(manualWhy)}"><ha-icon icon="mdi:arrow-down-bold"></ha-icon>Fermer</button>
           <button class="auto" data-act="auto" ${ovText ? "" : "disabled"}><ha-icon icon="mdi:autorenew"></ha-icon>Auto</button>
-        </div>` : ""}
+        </div>`}
       </ha-card>`;
 
     root.querySelectorAll("[data-mi]").forEach((el) =>
       el.addEventListener("click", () => this._moreInfo(el.dataset.mi))
     );
     const b = (sel, fn) => { const el = root.querySelector(sel); if (el) el.addEventListener("click", fn); };
-    b('[data-act="open"]', () => this._press("open_button", "Ouvrir l'ouvrant ? La commande manuelle reste prioritaire pendant la durée réglée."));
-    b('[data-act="close"]', () => this._press("close_button"));
+    b('[data-act="open"]', () => this._askConfirm("open"));
+    b('[data-act="close"]', () => this._askConfirm("close"));
+    b('[data-act="yes"]', () => this._answerConfirm(true));
+    b('[data-act="no"]', () => this._answerConfirm(false));
     b('[data-act="auto"]', () => this._press("resume_button"));
   }
 }
@@ -446,6 +481,14 @@ const STYLE = `
   button.open { background:#fb8c00; } button.close { background: var(--info-color,#039be5); }
   button.auto { background: var(--secondary-background-color,#e0e0e0); color: var(--primary-text-color); }
   button:disabled { opacity:.35; cursor:not-allowed; }
+  .btns.confirm { grid-template-columns: 1fr 1fr; }
+  .btns.confirm .q { grid-column: 1 / -1; display:flex; flex-direction:column; gap:2px; padding:8px 12px; border-radius:10px;
+                     background: var(--secondary-background-color,#f2f2f2); color: var(--primary-text-color); font-size:14px; }
+  .btns.confirm.open .q { border-left:4px solid #fb8c00; } .btns.confirm.close .q { border-left:4px solid var(--info-color,#039be5); }
+  .btns.confirm .q span { font-size:12px; color: var(--secondary-text-color); }
+  .msg { display:flex; align-items:center; gap:6px; margin-top:10px; padding:8px 12px; border-radius:10px; font-size:13px;
+         background: var(--error-color,#db4437); color:#fff; }
+  .msg ha-icon { --mdc-icon-size:18px; }
 `;
 
 if (!customElements.get("ventilation-desenfumage-card")) {
